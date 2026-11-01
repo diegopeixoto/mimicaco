@@ -51,24 +51,28 @@ function beep(freq = 880, ms = 150) {
 }
 
 // ---------- Sons (ElevenLabs) ----------
+// Música, falas do Rawzinho e efeitos podem ser ligados/desligados separadamente.
 const Som = (() => {
   const cache = {};
-  let on = true, music = null, unlocked = false, voiceBusy = null;
-  try { on = localStorage.getItem('mimica_som') !== 'off'; } catch {}
+  let opt = { musica: true, vozes: true, efeitos: true };
+  try { opt = { ...opt, ...(JSON.parse(localStorage.getItem('mimica_som2')) || {}) }; } catch {}
+  let music = null, unlocked = false, voiceBusy = null, wantMusic = false;
+  const save = () => { try { localStorage.setItem('mimica_som2', JSON.stringify(opt)); } catch {} };
   function get(name) {
     if (!cache[name]) { cache[name] = new Audio(`som/${name}.mp3`); cache[name].preload = 'auto'; }
     return cache[name];
   }
-  function play(name, vol = 0.8) {
-    if (!on) return;
-    try { const a = get(name).cloneNode(); a.volume = vol; a.play().catch(() => {}); return a; } catch {}
+  function raw(name, vol) {
+    try { const a = get(name).cloneNode(); a.volume = vol; a.play().catch(() => {}); return a; } catch { return null; }
   }
+  function play(name, vol = 0.8) { if (opt.efeitos) return raw(name, vol); }
   // falas do Rawzinho: abaixa a música enquanto ele fala, uma fala por vez
   function voz(name, delay = 0) {
-    if (!on) return;
+    if (!opt.vozes) return;
     setTimeout(() => {
+      if (!opt.vozes) return;
       if (voiceBusy) { try { voiceBusy.pause(); } catch {} }
-      const a = play('voz_' + name, 1);
+      const a = raw('voz_' + name, 1);
       if (!a) return;
       voiceBusy = a;
       if (music) music.volume = 0.12;
@@ -76,20 +80,16 @@ const Som = (() => {
     }, delay);
   }
   function startMusic() {
-    if (!on || music) return;
+    wantMusic = true;
+    if (!opt.musica || music || !unlocked) return;
     music = new Audio('som/musica.mp3');
     music.loop = true; music.volume = 0.35;
     music.play().catch(() => { music = null; });
   }
   function stopMusic() { if (music) { music.pause(); music = null; } }
-  function toggle() {
-    on = !on;
-    try { localStorage.setItem('mimica_som', on ? 'on' : 'off'); } catch {}
-    if (!on) stopMusic();
-    return on;
-  }
   // navegadores só tocam som depois de um toque na tela
   function unlock(withMusic, cb) {
+    wantMusic = withMusic;
     const go = () => {
       if (unlocked) return; unlocked = true;
       if (withMusic) startMusic();
@@ -98,12 +98,30 @@ const Som = (() => {
     ['pointerdown', 'keydown'].forEach((ev) => addEventListener(ev, go, { once: true }));
   }
   function button(withMusic) {
+    const wrap = document.createElement('div');
+    wrap.className = 'sound-box';
     const b = document.createElement('button');
     b.className = 'sound-toggle ghost';
-    const draw = () => (b.textContent = on ? '🔊' : '🔇');
+    const menu = document.createElement('div');
+    menu.className = 'sound-menu panel hidden';
+    const items = [['musica', '🎵 Música'], ['vozes', '🦖 Falas do Rawzinho'], ['efeitos', '🔔 Efeitos']].filter(([k]) => withMusic || k !== 'musica');
+    const draw = () => {
+      const anyOn = items.some(([k]) => opt[k]);
+      b.textContent = anyOn ? '🔊' : '🔇';
+      menu.innerHTML = items.map(([k, label]) => `<label><span>${label}</span><input type="checkbox" data-som="${k}" ${opt[k] ? 'checked' : ''}></label>`).join('');
+      menu.querySelectorAll('[data-som]').forEach((el) => (el.onchange = () => {
+        opt[el.dataset.som] = el.checked; save();
+        if (el.dataset.som === 'musica') { if (el.checked && wantMusic) startMusic(); else stopMusic(); }
+        if (el.dataset.som === 'vozes' && !el.checked && voiceBusy) { voiceBusy.pause(); voiceBusy = null; if (music) music.volume = 0.35; }
+        draw();
+      }));
+    };
     draw();
-    b.onclick = (e) => { e.stopPropagation(); toggle(); if (on && withMusic) startMusic(); draw(); };
-    document.body.appendChild(b);
+    b.onclick = (e) => { e.stopPropagation(); menu.classList.toggle('hidden'); };
+    menu.onclick = (e) => e.stopPropagation();
+    addEventListener('click', () => menu.classList.add('hidden'));
+    wrap.append(menu, b);
+    document.body.appendChild(wrap);
   }
-  return { play, voz, startMusic, stopMusic, toggle, unlock, button, get on() { return on; } };
+  return { play, voz, startMusic, stopMusic, unlock, button };
 })();

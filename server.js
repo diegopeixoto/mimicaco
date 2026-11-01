@@ -1,4 +1,4 @@
-// Mimicaço: servidor do jogo de mímica.
+// Mimicaço da Turma do Rawzinho: servidor do jogo de mímica.
 // Serve as páginas e mantém as salas em memória, conversando com a tela principal e os celulares por WebSocket.
 const http = require('http');
 const fs = require('fs');
@@ -11,22 +11,34 @@ const { CATEGORIES, TWISTS } = require('./cards');
 const PORT = process.env.PORT || 3000;
 const PUBLIC = path.join(__dirname, 'public');
 const TEAM_PRESETS = [
-  { name: 'Equipe Coral', color: '#ff6b6b' },
-  { name: 'Equipe Oceano', color: '#4dabf7' },
-  { name: 'Equipe Limão', color: '#94d82d' },
-  { name: 'Equipe Uva', color: '#b197fc' },
-  { name: 'Equipe Laranja', color: '#ffa94d' },
-  { name: 'Equipe Menta', color: '#38d9a9' },
+  { name: 'Equipe Rawzinho', color: '#5cc93a' },
+  { name: 'Equipe Morango', color: '#e8453c' },
+  { name: 'Equipe Mochila', color: '#2f7bf5' },
+  { name: 'Equipe Sol', color: '#ffc21a' },
+  { name: 'Equipe Uva', color: '#a26bff' },
+  { name: 'Equipe Chiclete', color: '#ff6fb5' },
 ];
 const CAT_ORDER = ['acao', 'objeto', 'gente', 'bicho', 'lugar', 'dificil'];
 const ROOM_TTL_MS = 6 * 60 * 60 * 1000;
+const BONUS_STEAL = 2; // casas extras para quem acerta na repescagem
+const BONUS_ALL = 3; // casas extras para quem acerta no "Todos jogam"
+const JUMP = 2; // casa "Pulo do Rawzinho"
+
+// Tempo da animação de um movimento (precisa bater com board3d.js)
+const DICE_MS = 1700;
+const HOP_MS = 330;
+function moveDuration(move) {
+  return (move.kind === 'dice' ? DICE_MS : 400) + move.path.length * HOP_MS + 300;
+}
 
 // ---------- Tabuleiro ----------
 function buildBoard(length) {
   const squares = [{ type: 'start' }];
+  let c = 0;
   for (let i = 1; i < length - 1; i++) {
-    if (i % 6 === 0) squares.push({ type: 'all' }); // Todos jogam
-    else squares.push({ type: 'cat', cat: CAT_ORDER[(i - 1) % 5] }); // sem "Desafio" no meio
+    if (i % 7 === 0) squares.push({ type: 'all' }); // Todos jogam
+    else if (i % 11 === 4) squares.push({ type: 'jump' }); // Pulo do Rawzinho: anda +2
+    else squares.push({ type: 'cat', cat: CAT_ORDER[c++ % CAT_ORDER.length] });
   }
   squares.push({ type: 'finish', cat: 'dificil' });
   return squares;
@@ -38,9 +50,8 @@ const rooms = new Map();
 function newCode() {
   const letters = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
   let code;
-  do {
-    code = Array.from({ length: 4 }, () => letters[crypto.randomInt(letters.length)]).join('');
-  } while (rooms.has(code));
+  do code = Array.from({ length: 4 }, () => letters[crypto.randomInt(letters.length)]).join('');
+  while (rooms.has(code));
   return code;
 }
 
@@ -50,15 +61,18 @@ function createRoom() {
     code,
     hostKey: crypto.randomBytes(12).toString('hex'),
     sockets: new Set(),
-    settings: { teamCount: 2, seconds: 60, boardLength: 31, twists: true },
+    settings: { teamCount: 2, seconds: 60, boardLength: 31, twists: true, steal: true, again: true },
     teams: [],
-    players: {}, // pid -> { name, teamId, connected }
-    phase: 'lobby', // lobby | turn | card | miming | timeup | roll | over
-    turn: null, // { teamIdx, allPlay }
-    mimerIdx: {}, // teamId -> índice do próximo mímico
-    card: null, // { cat, word, twist }
+    players: {}, // pid -> { names: [], teamId, connected }
+    phase: 'lobby', // lobby | turn | draw | card | miming | timeup | over
+    turn: null, // { teamIdx, allPlay, steal, stealIdx }
+    mimerIdx: {},
+    card: null,
     timerEnd: null,
-    lastRoll: null, // { teamId, value, from, to }
+    move: null, // último movimento: { id, teamId, kind, value, path, at, dur }
+    moveSeq: 0,
+    result: null, // { id, kind: 'hit' | 'miss' | 'steal_hit' | 'all_hit', teamId, word }
+    resultSeq: 0,
     winner: null,
     decks: {},
     message: '',
@@ -72,21 +86,12 @@ function createRoom() {
 
 function setTeams(room, n) {
   const old = room.teams;
-  room.teams = TEAM_PRESETS.slice(0, n).map((p, i) => ({
-    id: 't' + i,
-    name: old[i]?.name || p.name,
-    color: p.color,
-    pos: 0,
-  }));
-  for (const pl of Object.values(room.players)) {
-    if (!room.teams.find((t) => t.id === pl.teamId)) pl.teamId = null;
-  }
+  room.teams = TEAM_PRESETS.slice(0, n).map((p, i) => ({ id: 't' + i, name: old[i]?.name || p.name, color: p.color, pos: 0 }));
+  for (const pl of Object.values(room.players)) if (!room.teams.find((t) => t.id === pl.teamId)) pl.teamId = null;
 }
 
 function drawWord(room, cat) {
-  if (!room.decks[cat] || room.decks[cat].length === 0) {
-    room.decks[cat] = shuffle([...CATEGORIES[cat].words]);
-  }
+  if (!room.decks[cat] || room.decks[cat].length === 0) room.decks[cat] = shuffle([...CATEGORIES[cat].words]);
   return room.decks[cat].pop();
 }
 
@@ -98,73 +103,117 @@ function shuffle(a) {
   return a;
 }
 
-function teamPlayers(room, teamId) {
-  return Object.entries(room.players)
-    .filter(([, p]) => p.teamId === teamId)
-    .map(([pid]) => pid);
-}
+const last = (room) => room.board.length - 1;
+const squareAt = (room, pos) => room.board[Math.min(pos, last(room))];
 
-function currentTeam(room) {
-  return room.turn ? room.teams[room.turn.teamIdx] : null;
-}
-
-// Mímico da vez: próximo jogador conectado da equipe (rodízio).
-function currentMimer(room) {
-  const team = currentTeam(room);
-  if (!team) return null;
-  const pids = teamPlayers(room, team.id);
-  if (pids.length === 0) return null;
-  const start = room.mimerIdx[team.id] || 0;
-  for (let k = 0; k < pids.length; k++) {
-    const pid = pids[(start + k) % pids.length];
-    if (room.players[pid].connected) return pid;
+// Cada celular pode ter várias pessoas. O mímico gira entre as pessoas da equipe.
+function slots(room, teamId) {
+  const out = [];
+  for (const [pid, p] of Object.entries(room.players)) {
+    if (p.teamId !== teamId) continue;
+    p.names.forEach((name, i) => out.push({ pid, i, name, connected: p.connected }));
   }
-  return pids[start % pids.length];
+  return out;
 }
 
-function squareAt(room, pos) {
-  return room.board[Math.min(pos, room.board.length - 1)];
+// Equipe que está fazendo a mímica agora (na repescagem é a próxima equipe).
+function actingTeam(room) {
+  if (!room.turn) return null;
+  return room.teams[room.turn.steal ? room.turn.stealIdx : room.turn.teamIdx];
+}
+const turnTeam = (room) => (room.turn ? room.teams[room.turn.teamIdx] : null);
+
+function currentMimer(room) {
+  const team = actingTeam(room);
+  if (!team) return null;
+  const list = slots(room, team.id);
+  if (!list.length) return null;
+  const start = room.mimerIdx[team.id] || 0;
+  for (let k = 0; k < list.length; k++) {
+    const s = list[(start + k) % list.length];
+    if (s.connected) return s;
+  }
+  return list[start % list.length];
 }
 
-function startTurn(room, teamIdx) {
-  const team = room.teams[teamIdx];
-  const sq = squareAt(room, team.pos);
-  room.turn = { teamIdx, allPlay: sq.type === 'all' };
+function advanceMimer(room, team) {
+  const n = slots(room, team.id).length;
+  if (n) room.mimerIdx[team.id] = ((room.mimerIdx[team.id] || 0) + 1) % n;
+}
+
+function startTurn(room, teamIdx, message = '') {
+  room.turn = { teamIdx, allPlay: false, steal: false, stealIdx: null };
   room.card = null;
   room.timerEnd = null;
   room.phase = 'turn';
-  room.message = '';
+  room.message = message;
 }
 
-function nextTeamIdx(room) {
-  return (room.turn.teamIdx + 1) % room.teams.length;
+const nextIdx = (room, i) => (i + 1) % room.teams.length;
+
+// Anda com o peão e registra o caminho casa a casa para a animação.
+function moveTeam(room, team, steps, kind, value = null) {
+  const from = team.pos;
+  const pathArr = [];
+  let pos = from;
+  for (let s = 0; s < steps && pos < last(room); s++) pathArr.push(++pos);
+  let jumped = false;
+  if (kind === 'dice' && squareAt(room, pos).type === 'jump') {
+    jumped = true;
+    for (let s = 0; s < JUMP && pos < last(room); s++) pathArr.push(++pos);
+  }
+  team.pos = pos;
+  room.move = { id: ++room.moveSeq, teamId: team.id, kind, value, from, path: pathArr, jumped, at: Date.now() };
+  room.move.dur = moveDuration(room.move);
+  return room.move;
 }
 
-function advanceMimer(room) {
-  const team = currentTeam(room);
-  const pids = teamPlayers(room, team.id);
-  if (pids.length) room.mimerIdx[team.id] = ((room.mimerIdx[team.id] || 0) + 1) % pids.length;
+function setResult(room, kind, teamId, word) {
+  room.result = { id: ++room.resultSeq, kind, teamId, word };
+}
+
+function startTimer(room, seconds) {
+  room.phase = 'miming';
+  room.timerEnd = Date.now() + seconds * 1000;
+  clearTimeout(room.timer);
+  room.timer = setTimeout(() => {
+    if (room.phase === 'miming') {
+      room.phase = 'timeup';
+      broadcast(room);
+    }
+  }, seconds * 1000 + 300);
 }
 
 // ---------- Ações ----------
-function isMimer(room, who) {
-  return who.pid && who.pid === currentMimer(room);
-}
-
 function handle(room, who, msg) {
   const host = who.host;
-  const mimerOrHost = host || isMimer(room, who);
+  const me = who.pid && room.players[who.pid];
+  const mimer = currentMimer(room);
+  const isMimer = mimer && who.pid === mimer.pid;
+  const acting = actingTeam(room);
+  const inActing = me && acting && me.teamId === acting.id;
+  const can = host || isMimer;
   switch (msg.t) {
     case 'join_team': {
-      if (!who.pid) return;
+      if (!me) return;
       const team = room.teams.find((t) => t.id === msg.teamId);
-      if (team) room.players[who.pid].teamId = team.id;
+      if (team) { me.teamId = team.id; me.judge = false; }
       break;
     }
-    case 'rename': {
-      if (!who.pid) return;
-      const name = String(msg.name || '').trim().slice(0, 20);
-      if (name) room.players[who.pid].name = name;
+    case 'be_judge': {
+      // o juiz não joga por nenhuma equipe, vê as palavras e decide acertou/errou
+      if (!me) return;
+      me.judge = !!msg.on;
+      if (me.judge) me.teamId = null;
+      break;
+    }
+    case 'names': {
+      if (!me) return;
+      const names = (Array.isArray(msg.names) ? msg.names : [])
+        .map((n) => String(n || '').trim().slice(0, 20))
+        .filter(Boolean)
+        .slice(0, 8);
+      if (names.length) me.names = names;
       break;
     }
     case 'settings': {
@@ -176,7 +225,7 @@ function handle(room, who, msg) {
         room.settings.boardLength = s.boardLength;
         room.board = buildBoard(s.boardLength);
       }
-      if (typeof s.twists === 'boolean') room.settings.twists = s.twists;
+      for (const k of ['twists', 'steal', 'again']) if (typeof s[k] === 'boolean') room.settings[k] = s[k];
       room.settings.teamCount = room.teams.length;
       break;
     }
@@ -187,163 +236,194 @@ function handle(room, who, msg) {
       if (team && name) team.name = name;
       break;
     }
-    case 'kick': {
-      if (!host) return;
-      delete room.players[msg.pid];
-      break;
-    }
     case 'start_game': {
       if (!host || room.phase !== 'lobby') return;
       room.teams.forEach((t) => (t.pos = 0));
       room.winner = null;
-      room.lastRoll = null;
+      room.move = null;
+      room.result = null;
       startTurn(room, 0);
       break;
     }
-    case 'draw': {
-      if (!mimerOrHost || room.phase !== 'turn') return;
-      const team = currentTeam(room);
+    case 'roll': {
+      // qualquer pessoa da equipe da vez (ou a tela principal) pode jogar o dado
+      if (room.phase !== 'turn' || !(host || inActing)) return;
+      if (room.move && Date.now() < room.move.at + room.move.dur - 200) return; // espera a animação anterior
+      const team = turnTeam(room);
+      const value = 1 + crypto.randomInt(6);
+      const mv = moveTeam(room, team, value, 'dice', value);
       const sq = squareAt(room, team.pos);
-      let cat;
-      if (sq.type === 'cat' || sq.type === 'finish') cat = sq.cat;
-      else cat = CAT_ORDER[crypto.randomInt(CAT_ORDER.length)]; // início e "Todos jogam": categoria sorteada
+      room.turn.allPlay = sq.type === 'all';
+      room.phase = 'draw';
+      room.message = mv.jumped ? 'Pulo do Rawzinho! +2 casas' : '';
+      break;
+    }
+    case 'draw': {
+      if (!can || room.phase !== 'draw') return;
+      const team = turnTeam(room);
+      const sq = squareAt(room, team.pos);
+      const cat = sq.cat || CAT_ORDER[crypto.randomInt(CAT_ORDER.length)];
       const twist = room.settings.twists && crypto.randomInt(4) === 0 ? TWISTS[crypto.randomInt(TWISTS.length)] : null;
       room.card = { cat, word: drawWord(room, cat), twist };
       room.phase = 'card';
       break;
     }
     case 'swap_card': {
-      // Mímico não conhece a palavra: troca uma vez de graça.
-      if (!mimerOrHost || room.phase !== 'card' || room.card.swapped) return;
+      if (!can || room.phase !== 'card' || room.card.swapped || room.turn.steal) return;
       room.card.word = drawWord(room, room.card.cat);
       room.card.swapped = true;
       break;
     }
     case 'go': {
-      if (!mimerOrHost || room.phase !== 'card') return;
-      room.phase = 'miming';
-      room.timerEnd = Date.now() + room.settings.seconds * 1000;
-      clearTimeout(room.timer);
-      room.timer = setTimeout(() => {
-        if (room.phase === 'miming') {
-          room.phase = 'timeup';
-          broadcast(room);
-        }
-      }, room.settings.seconds * 1000 + 300);
+      if (!can || room.phase !== 'card') return;
+      const secs = room.turn.steal ? Math.ceil(room.settings.seconds / 2) : room.settings.seconds;
+      startTimer(room, secs);
       break;
     }
     case 'result': {
-      // msg.teamId: equipe que acertou (ou null = ninguém)
-      if (!mimerOrHost || !['miming', 'timeup'].includes(room.phase)) return;
+      const judging = hasJudge(room) ? host || me?.judge : can;
+      if (!judging || !['miming', 'timeup'].includes(room.phase)) return;
       clearTimeout(room.timer);
-      const team = currentTeam(room);
-      let winnerTeam = null;
-      if (msg.teamId) {
-        winnerTeam = room.turn.allPlay ? room.teams.find((t) => t.id === msg.teamId) : team;
-      }
-      room.revealed = { ...room.card };
-      advanceMimer(room);
-      if (!winnerTeam) {
-        room.lastRoll = null;
-        startTurn(room, nextTeamIdx(room));
-        room.message = `Ninguém acertou "${room.revealed.word}".`;
-        return;
-      }
-      // Rola o dado e anda.
-      const value = 1 + crypto.randomInt(6);
-      const from = winnerTeam.pos;
-      const to = Math.min(from + value, room.board.length - 1);
-      const wasOnFinish = team.pos === room.board.length - 1 && winnerTeam.id === team.id;
-      winnerTeam.pos = to;
-      room.lastRoll = { teamId: winnerTeam.id, value, from, to, word: room.card.word };
-      if (wasOnFinish) {
-        room.winner = winnerTeam.id;
-        room.phase = 'over';
-        return;
-      }
-      room.phase = 'roll';
-      room.message = `${winnerTeam.name} acertou "${room.card.word}" e tirou ${value} no dado!`;
-      break;
-    }
-    case 'next': {
-      if (!mimerOrHost || room.phase !== 'roll') return;
-      startTurn(room, nextTeamIdx(room));
+      onResult(room, msg.teamId || null);
       break;
     }
     case 'skip_mimer': {
-      if (!host || room.phase !== 'turn') return;
-      advanceMimer(room);
+      if (!host || !['turn', 'draw', 'card'].includes(room.phase)) return;
+      advanceMimer(room, actingTeam(room));
       break;
     }
     case 'skip_turn': {
-      if (!host || !['turn', 'card'].includes(room.phase)) return;
-      startTurn(room, nextTeamIdx(room));
+      if (!host || ['lobby', 'over'].includes(room.phase)) return;
+      clearTimeout(room.timer);
+      startTurn(room, nextIdx(room, room.turn.teamIdx));
       break;
     }
     case 'back_to_lobby': {
       if (!host) return;
       clearTimeout(room.timer);
-      room.phase = 'lobby';
-      room.turn = null;
-      room.card = null;
-      room.winner = null;
+      Object.assign(room, { phase: 'lobby', turn: null, card: null, winner: null, move: null, result: null });
       room.teams.forEach((t) => (t.pos = 0));
       break;
     }
   }
 }
 
+function hasJudge(room) {
+  return Object.values(room.players).some((p) => p.judge && p.connected);
+}
+
+function onResult(room, guessedTeamId) {
+  const team = turnTeam(room);
+  const word = room.card.word;
+  const onFinish = team.pos === last(room);
+
+  // Repescagem: a próxima equipe tentou a mesma carta
+  if (room.turn.steal) {
+    const stealTeam = room.teams[room.turn.stealIdx];
+    advanceMimer(room, stealTeam);
+    if (guessedTeamId) {
+      setResult(room, 'steal_hit', stealTeam.id, word);
+      moveTeam(room, stealTeam, BONUS_STEAL, 'bonus');
+      startTurn(room, room.turn.stealIdx, `${stealTeam.name} roubou a carta e ganhou +${BONUS_STEAL} casas!`);
+    } else {
+      setResult(room, 'miss', null, word);
+      startTurn(room, room.turn.stealIdx, `Ninguém acertou "${word}".`);
+    }
+    return;
+  }
+
+  advanceMimer(room, team);
+
+  // Todos jogam: quem acertar ganha casas extras
+  if (room.turn.allPlay) {
+    const winner = room.teams.find((t) => t.id === guessedTeamId);
+    if (!winner) {
+      setResult(room, 'miss', null, word);
+      return startTurn(room, nextIdx(room, room.turn.teamIdx), `Ninguém acertou "${word}".`);
+    }
+    setResult(room, 'all_hit', winner.id, word);
+    moveTeam(room, winner, BONUS_ALL, 'bonus');
+    const again = winner.id === team.id && room.settings.again;
+    return startTurn(room, again ? room.turn.teamIdx : nextIdx(room, room.turn.teamIdx),
+      `${winner.name} acertou e ganhou +${BONUS_ALL} casas!`);
+  }
+
+  if (guessedTeamId) {
+    setResult(room, 'hit', team.id, word);
+    if (onFinish) {
+      room.winner = team.id;
+      room.phase = 'over';
+      return;
+    }
+    return startTurn(room, room.settings.again ? room.turn.teamIdx : nextIdx(room, room.turn.teamIdx),
+      room.settings.again ? `${team.name} acertou e joga de novo!` : `${team.name} acertou!`);
+  }
+
+  // Errou: a próxima equipe tenta a mesma carta, com metade do tempo
+  if (room.settings.steal && room.teams.length > 1 && slots(room, room.teams[nextIdx(room, room.turn.teamIdx)].id).length) {
+    setResult(room, 'miss', null, null);
+    room.turn.steal = true;
+    room.turn.stealIdx = nextIdx(room, room.turn.teamIdx);
+    room.card.twist = null;
+    room.timerEnd = null;
+    room.phase = 'card';
+    room.message = `Repescagem! ${room.teams[room.turn.stealIdx].name} tenta a mesma carta.`;
+    return;
+  }
+  setResult(room, 'miss', null, word);
+  startTurn(room, nextIdx(room, room.turn.teamIdx), `Ninguém acertou "${word}".`);
+}
+
 // ---------- Estado enviado a cada tela ----------
-// A palavra só vai para quem pode ver: o mímico e, fora do "Todos jogam", as outras equipes (para conferir).
+// A palavra só vai para quem pode ver: o celular do mímico e as equipes juízas (fora do "Todos jogam").
 function viewFor(room, who) {
-  const team = currentTeam(room);
   const mimer = currentMimer(room);
+  const acting = actingTeam(room);
   let canSee = false;
   if (room.card && who.pid) {
     const me = room.players[who.pid];
-    if (who.pid === mimer) canSee = true;
-    else if (team && !room.turn.allPlay && me && me.teamId && me.teamId !== team.id && room.phase !== 'card') canSee = true;
+    if (mimer && who.pid === mimer.pid) canSee = true;
+    else if (me?.judge) canSee = true;
+    else if (acting && !room.turn.allPlay && me?.teamId && me.teamId !== acting.id && room.phase !== 'card') canSee = true;
   }
   const card = room.card
-    ? {
-        cat: room.card.cat,
-        twist: room.card.twist,
-        swapped: !!room.card.swapped,
-        word: canSee || (who.host && msgHostPeek(who)) ? room.card.word : null,
-      }
+    ? { cat: room.card.cat, twist: room.card.twist, swapped: !!room.card.swapped, word: canSee || (who.host && who.peek) ? room.card.word : null }
     : null;
   return {
     t: 'state',
     code: room.code,
     you: who.host ? { host: true } : { pid: who.pid, ...room.players[who.pid] },
     settings: room.settings,
-    teams: room.teams.map((t) => ({ ...t, players: teamPlayers(room, t.id).map((pid) => ({ pid, ...room.players[pid] })) })),
-    unassigned: Object.entries(room.players).filter(([, p]) => !p.teamId).map(([pid, p]) => ({ pid, ...p })),
+    teams: room.teams.map((t) => ({ ...t, people: slots(room, t.id) })),
+    unassigned: Object.entries(room.players).filter(([, p]) => !p.teamId && !p.judge).map(([pid, p]) => ({ pid, ...p })),
+    judges: Object.entries(room.players).filter(([, p]) => p.judge).map(([pid, p]) => ({ pid, ...p })),
+    hasJudge: hasJudge(room),
     board: room.board,
     phase: room.phase,
-    turn: room.turn ? { ...room.turn, teamId: team.id, mimer, mimerName: mimer ? room.players[mimer]?.name : null } : null,
+    turn: room.turn
+      ? { ...room.turn, teamId: turnTeam(room).id, actingId: acting.id, mimer: mimer ? { pid: mimer.pid, name: mimer.name } : null }
+      : null,
     card,
     timerEnd: room.timerEnd,
     now: Date.now(),
-    lastRoll: room.lastRoll,
+    move: room.move,
+    result: room.result,
     winner: room.winner,
     message: room.message,
     categories: Object.fromEntries(Object.entries(CATEGORIES).map(([k, c]) => [k, { name: c.name, emoji: c.emoji, color: c.color }])),
   };
 }
-function msgHostPeek(who) {
-  return who.peek; // a tela principal só vê a palavra enquanto segura o botão "espiar"
-}
 
 function broadcast(room) {
   room.touched = Date.now();
-  for (const ws of room.sockets) {
-    if (ws.readyState === 1) ws.send(JSON.stringify(viewFor(room, ws.who)));
-  }
+  for (const ws of room.sockets) if (ws.readyState === 1) ws.send(JSON.stringify(viewFor(room, ws.who)));
 }
 
 // ---------- HTTP ----------
-const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.svg': 'image/svg+xml', '.png': 'image/png' };
+const MIME = {
+  '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.svg': 'image/svg+xml',
+  '.png': 'image/png', '.jpg': 'image/jpeg', '.mp3': 'audio/mpeg', '.ttf': 'font/ttf', '.txt': 'text/plain; charset=utf-8',
+};
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
@@ -353,8 +433,8 @@ const server = http.createServer(async (req, res) => {
     return res.end(JSON.stringify({ code: room.code, hostKey: room.hostKey }));
   }
   if (url.pathname === '/api/qr') {
-    const text = url.searchParams.get('u') || '';
-    const svg = await QRCode.toString(text, { type: 'svg', margin: 1, color: { dark: '#1b1035', light: '#ffffff' } });
+    const text = (url.searchParams.get('u') || '').slice(0, 300);
+    const svg = await QRCode.toString(text, { type: 'svg', margin: 1, color: { dark: '#123a7a', light: '#ffffff' } });
     res.writeHead(200, { 'content-type': 'image/svg+xml' });
     return res.end(svg);
   }
@@ -367,9 +447,8 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(302, { location: '/jogar.html?sala=' + url.pathname.slice(1).toUpperCase() });
     return res.end();
   }
-  let file = url.pathname === '/' ? '/index.html' : url.pathname;
-  file = path.normalize(file).replace(/^(\.\.[/\\])+/, '');
-  const full = path.join(PUBLIC, file);
+  const file = url.pathname === '/' ? '/index.html' : url.pathname;
+  const full = path.join(PUBLIC, path.normalize(decodeURIComponent(file)));
   if (!full.startsWith(PUBLIC)) {
     res.writeHead(403);
     return res.end();
@@ -379,7 +458,9 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(404);
       return res.end('Não encontrado');
     }
-    res.writeHead(200, { 'content-type': MIME[path.extname(full)] || 'application/octet-stream' });
+    const ext = path.extname(full);
+    const cache = ['.jpg', '.png', '.mp3', '.ttf'].includes(ext) || full.includes('/vendor/') ? 'public, max-age=86400' : 'no-cache';
+    res.writeHead(200, { 'content-type': MIME[ext] || 'application/octet-stream', 'cache-control': cache });
     res.end(data);
   });
 });
@@ -405,8 +486,9 @@ wss.on('connection', (ws) => {
         ws.who = { host: true };
       } else {
         const pid = String(msg.pid || '').slice(0, 40) || crypto.randomUUID();
-        const name = String(msg.name || '').trim().slice(0, 20) || 'Jogador';
-        if (!room.players[pid]) room.players[pid] = { name, teamId: null, connected: true };
+        let names = (Array.isArray(msg.names) ? msg.names : [msg.name]).map((n) => String(n || '').trim().slice(0, 20)).filter(Boolean).slice(0, 8);
+        if (!names.length) names = ['Jogador'];
+        if (!room.players[pid]) room.players[pid] = { names, teamId: null, judge: false, connected: true };
         room.players[pid].connected = true;
         ws.who = { pid };
       }
@@ -427,8 +509,7 @@ wss.on('connection', (ws) => {
     if (!room) return;
     room.sockets.delete(ws);
     if (ws.who.pid && room.players[ws.who.pid]) {
-      const stillOn = [...room.sockets].some((s) => s.who.pid === ws.who.pid);
-      room.players[ws.who.pid].connected = stillOn;
+      room.players[ws.who.pid].connected = [...room.sockets].some((s) => s.who.pid === ws.who.pid);
     }
     broadcast(room);
   });
@@ -443,9 +524,7 @@ setInterval(() => {
       ws.ping();
     }
   }
-  for (const [code, room] of rooms) {
-    if (room.sockets.size === 0 && Date.now() - room.touched > ROOM_TTL_MS) rooms.delete(code);
-  }
+  for (const [code, room] of rooms) if (room.sockets.size === 0 && Date.now() - room.touched > ROOM_TTL_MS) rooms.delete(code);
 }, 30000);
 
 server.listen(PORT, () => console.log(`Mimicaço rodando em http://localhost:${PORT}`));

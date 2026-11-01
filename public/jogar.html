@@ -8,162 +8,265 @@
 <link rel="stylesheet" href="style.css">
 <style>
   body { min-height: 100dvh; background: #8fd16a url(img/fundo_celular.jpg) center top/cover fixed; }
-  main::before { content: ''; position: fixed; inset: 0; z-index: -1; background: linear-gradient(180deg, rgba(18,58,122,.55), rgba(18,58,122,.85)); }
-  body.tc main::before { background: linear-gradient(180deg, color-mix(in srgb, var(--tc) 70%, transparent), rgba(18,58,122,.88) 55%); }
-  main { max-width: 480px; margin: 0 auto; padding: 16px 16px 32px; text-align: center; }
-  .top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; font-size: .95rem; }
-  .me { display: flex; gap: 8px; align-items: center; }
-  .me .dot { width: 16px; height: 16px; border-radius: 50%; background: var(--tc, #888); }
-  .teambtn { width: 100%; font-size: 1.3rem; padding: .9em; color: #123a7a; display: flex; justify-content: space-between; }
-  .teambtn small { font-weight: 600; opacity: .7; }
-  .teambtn.mine { outline: 4px solid #fff; }
-  .art { width: 46vw; max-width: 200px; aspect-ratio: 1; border-radius: 50%; object-fit: cover; border: 5px solid #fff; box-shadow: 0 8px 0 rgba(10,30,70,.35); margin: 6px auto 12px; display: block; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; background: linear-gradient(180deg, rgba(18,58,122,.35), rgba(18,58,122,.85)); }
+  body.tc::before { background: linear-gradient(180deg, color-mix(in srgb, var(--tc) 65%, transparent), rgba(18,58,122,.9) 50%); }
+  main { max-width: 480px; margin: 0 auto; padding: 12px 16px 90px; text-align: center; }
+  .top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: .95rem; }
+  .me { display: flex; gap: 8px; align-items: center; min-width: 0; }
+  .me b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .me .dot { width: 16px; height: 16px; border-radius: 50%; background: var(--tc, #fff); flex: none; }
+  #boardWrap { position: relative; height: 34vh; min-height: 200px; margin: 0 -16px 12px; transition: height .35s; }
+  #boardWrap.small { height: 0; min-height: 0; overflow: hidden; margin-bottom: 0; }
+  #board { position: absolute; inset: 0; }
+  .boardBtn { position: absolute; right: 12px; bottom: 8px; z-index: 3; padding: .3em .8em; font-size: .9rem; }
+  .teambtn { width: 100%; font-size: 1.25rem; padding: .85em; color: #fff; display: flex; justify-content: space-between; align-items: center; text-shadow: 0 2px 0 rgba(0,0,0,.25); }
+  .teambtn small { font-family: 'Baloo 2', sans-serif; font-weight: 700; opacity: .9; }
+  .teambtn.mine { outline: 4px solid #fff; outline-offset: 2px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  .chip { background: #fff; color: #123a7a; border-radius: 999px; padding: .3em .5em .3em .9em; font-weight: 800; display: inline-flex; align-items: center; gap: 6px; }
+  .chip button { padding: 0 .45em; box-shadow: none; background: #ffd6d6; color: #c0262c; font-size: .9rem; border-radius: 50%; }
+  .addrow { display: flex; gap: 8px; }
+  .addrow input { flex: 1; }
+  .art { width: 40vw; max-width: 180px; aspect-ratio: 1; border-radius: 50%; object-fit: cover; border: 5px solid #fff; box-shadow: 0 8px 0 rgba(10,30,70,.35); margin: 6px auto 12px; display: block; }
   .word { font-family: 'Lilita One', sans-serif; font-size: clamp(2rem, 11vw, 3.2rem); line-height: 1.05; margin: .3em 0; color: var(--accent); word-break: break-word; }
   .twist { display: inline-block; background: var(--bad); color: #fff; font-weight: 800; padding: .25em .9em; border-radius: 999px; }
-  .timer { font-family: 'Lilita One', sans-serif; font-size: 3.6rem; line-height: 1; }
+  .timer { font-family: 'Lilita One', sans-serif; font-size: 3.4rem; line-height: 1; }
   .timer.low { color: var(--bad); }
   .btns { display: grid; gap: 10px; margin-top: 16px; }
   .btns.two { grid-template-columns: 1fr 1fr; }
   .hint { color: var(--muted); font-size: 1.05rem; }
-  .huge { font-size: 1.8rem; padding: 1em; }
+  .huge { font-size: 1.7rem; padding: .9em; }
+  .banner { background: var(--accent); color: #123a7a; font-family: 'Lilita One', sans-serif; padding: .35em .8em; border-radius: 12px; margin-bottom: 10px; }
   .hidden-word { filter: blur(14px); transition: filter .2s; user-select: none; }
   .hidden-word.show { filter: none; }
+  /* carta que vira */
+  .card3d { perspective: 900px; width: min(72vw, 280px); aspect-ratio: 4/5; margin: 4px auto 10px; }
+  .card3d .inner { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; animation: flip 1.1s .2s cubic-bezier(.4,1.4,.5,1) forwards; }
+  .card3d.still .inner { animation: none; transform: rotateY(180deg); }
+  @keyframes flip { from { transform: rotateY(0) scale(.7); } 60% { transform: rotateY(200deg) scale(1.05); } to { transform: rotateY(180deg) scale(1); } }
+  .card3d .face { position: absolute; inset: 0; backface-visibility: hidden; border-radius: 22px; border: 6px solid #fff; box-shadow: 0 10px 0 rgba(10,30,70,.35); display: grid; place-items: center; padding: 14px; overflow: hidden; }
+  .card3d .front { background: var(--cc) url(img/logo.png) center/80% no-repeat; }
+  .card3d .back { transform: rotateY(180deg); background: #fff; color: #123a7a; align-content: center; gap: 8px; }
+  .card3d .back img { width: 58%; aspect-ratio: 1; border-radius: 50%; object-fit: cover; border: 5px solid var(--cc); }
+  .card3d .back .w { font-family: 'Lilita One', sans-serif; font-size: clamp(1.6rem, 8vw, 2.3rem); line-height: 1.05; }
+  .card3d .back .c { font-weight: 800; color: var(--cc); }
+  .pop { animation: pop .5s cubic-bezier(.3,1.8,.5,1); }
+  @keyframes pop { from { transform: scale(.4); opacity: 0; } }
+  .toast { position: fixed; left: 50%; top: 40%; transform: translate(-50%, -50%) scale(.3); opacity: 0; z-index: 40; text-align: center; pointer-events: none; transition: transform .4s cubic-bezier(.3,1.7,.5,1), opacity .3s; width: 90vw; }
+  .toast.show { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  .toast img { width: 150px; height: 150px; border-radius: 50%; object-fit: cover; border: 6px solid #fff; }
+  .toast h1 { font-size: 2.6rem; color: #fff; -webkit-text-stroke: 3px #123a7a; paint-order: stroke fill; text-shadow: 0 5px 0 #123a7a; margin: .2em 0 0; }
 </style>
 </head>
 <body>
-<main id="app"><p class="hint">Conectando…</p></main>
+<main>
+  <div id="top"></div>
+  <div id="boardWrap" class="small"><div id="board"></div><button class="ghost boardBtn" id="boardBtn">Esconder</button></div>
+  <div id="app"><p class="hint">Conectando…</p></div>
+</main>
+<div class="toast" id="toast"></div>
 <script src="net.js"></script>
-<script>
+<script type="module">
+import { createBoard } from './board3d.js';
+
 const params = new URLSearchParams(location.search);
 const code = (params.get('sala') || '').toUpperCase();
 const saved = store('mimica_player') || {};
 const pid = saved.pid || (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2));
-store('mimica_player', { ...saved, pid });
-let name = saved.name;
-let S = null, net = null, lastPhase = null, wasMimer = false, revealWord = false;
+let names = saved.names || (saved.name ? [saved.name] : []);
+store('mimica_player', { ...saved, pid, names });
+let S = null, net = null, lastPhase = null, lastResultId = null, lastMoveId = null, revealWord = false, board = null, boardHidden = false, flipShownFor = null;
 const app = document.getElementById('app');
 const img = (k) => `img/${k}.jpg`;
+const saveNames = () => store('mimica_player', { ...store('mimica_player'), names });
 
 if (!code) location.href = '/';
-if (!name) askName(); else start();
+if (!names.length) askName(); else start();
 Som.unlock(false);
 Som.button(false);
 
 function askName() {
-  app.innerHTML = `<div class="stack" style="padding-top:10vh">
+  app.innerHTML = `<div class="stack" style="padding-top:6vh">
     <img src="img/logo.png" alt="Turma do Rawzinho" style="width:min(300px,80vw)">
     <img class="art" src="img/hero.jpg" alt="">
     <h2>Sala ${esc(code)}</h2>
     <input id="nm" maxlength="20" placeholder="Seu nome" autofocus>
-    <button class="big" id="ok">Entrar</button></div>`;
+    <button class="big" id="ok">Entrar</button>
+    <p class="hint">Vão jogar várias pessoas neste celular? Depois de entrar dá para adicionar mais nomes.</p></div>`;
   const go = () => {
     const v = document.getElementById('nm').value.trim();
     if (!v) return;
-    name = v; store('mimica_player', { ...store('mimica_player'), name });
-    start();
+    names = [v]; saveNames(); start();
   };
   document.getElementById('ok').onclick = go;
   document.getElementById('nm').onkeydown = (e) => e.key === 'Enter' && go();
 }
 
 function start() {
-  net = connect(() => ({ code, pid, name }), (st) => { S = st; render(); }, (err) => {
+  net = connect(() => ({ code, pid, names }), (st) => { S = st; render(); }, (err) => {
     app.innerHTML = `<div class="stack" style="padding-top:20vh"><h2>Ops!</h2><p>${esc(err)}</p><button onclick="location.href='/'">Voltar</button></div>`;
   });
 }
 const send = (m) => net.send(m);
+const now = () => Date.now() + (net?.offset || 0);
+const moving = () => S?.move && now() < S.move.at + S.move.dur;
+const teamById = (id) => S.teams.find((t) => t.id === id);
+
+// Tabuleiro 3D no celular (carrega só quando o jogo começa)
+function ensureBoard() {
+  const wrap = document.getElementById('boardWrap');
+  // quem está com a carta precisa da tela toda: esconde o tabuleiro nessa hora
+  const busy = S.turn?.mimer?.pid === S.you.pid && ['card', 'miming', 'timeup'].includes(S.phase);
+  wrap.classList.toggle('small', boardHidden || busy || S.phase === 'lobby');
+  document.getElementById('boardBtn').textContent = boardHidden ? 'Ver tabuleiro' : 'Esconder';
+  if (S.phase === 'lobby' || board) return;
+  board = 'loading';
+  createBoard(document.getElementById('board'), { low: true, zoom: 0.9, onHop: () => Som.play('pulo', .3) })
+    .then((b) => { board = b; b.update(S, net.offset); });
+}
+document.getElementById('boardBtn').onclick = () => { boardHidden = !boardHidden; ensureBoard(); };
+
+let toastTimer;
+function toast(html) {
+  const el = document.getElementById('toast');
+  el.innerHTML = html; el.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('show'), 1900);
+}
 
 function render() {
   const me = S.you;
-  const myTeam = S.teams.find((t) => t.id === me.teamId);
+  const myTeam = teamById(me.teamId);
   document.body.classList.toggle('tc', !!myTeam);
   if (myTeam) document.body.style.setProperty('--tc', myTeam.color);
-  const top = `<div class="top"><div class="me"><span class="dot"></span><b>${esc(me.name)}</b>${myTeam ? `<span class="muted">· ${esc(myTeam.name)}</span>` : ''}</div><div class="muted">Sala ${esc(S.code)}</div></div>`;
-  let body = '';
+  document.getElementById('top').innerHTML = `<div class="top"><div class="me"><span class="dot"></span><b>${esc(me.names.join(', '))}</b>
+    ${myTeam ? `<span class="muted">· ${esc(myTeam.name)}</span>` : me.judge ? '<span class="muted">· ⚖️ Juiz</span>' : ''}</div><div class="muted">Sala ${esc(S.code)}</div></div>`;
+  ensureBoard();
+  if (board && board !== 'loading') board.update(S, net.offset);
 
-  if (S.phase === 'lobby' || !myTeam) {
-    body = `<h2>Escolha sua equipe</h2>
-      <div class="btns">${S.teams.map((t) => `<button class="teambtn ${t.id === me.teamId ? 'mine' : ''}" style="background:${t.color}" data-team="${t.id}">
-        <span>${esc(t.name)}</span><small>${t.players.length} ${t.players.length === 1 ? 'pessoa' : 'pessoas'}</small></button>`).join('')}</div>
-      <p class="hint">${myTeam ? 'Pronto! Esperando a tela principal começar o jogo.' : 'Toque numa equipe para entrar.'}</p>
-      <button class="ghost" id="rename">Trocar meu nome</button>`;
-  } else {
-    const team = S.teams.find((t) => t.id === S.turn.teamId);
-    const iAmMimer = S.turn.mimer === me.pid;
-    const myTurn = team.id === me.teamId;
-    const cat = S.card && S.categories[S.card.cat];
-    const catHtml = cat ? `<img class="art" src="${img(S.card.cat)}" alt=""><div class="pill" style="background:${cat.color}">${cat.emoji} ${esc(cat.name)}</div>` : '';
-    const twist = S.card?.twist ? `<div style="margin-top:10px"><span class="twist">${esc(S.card.twist)}</span></div>` : '';
-    const resultBtns = S.turn.allPlay
-      ? `<div class="btns">${S.teams.map((t) => `<button style="background:${t.color}" data-result="${t.id}">${esc(t.name)} acertou</button>`).join('')}<button class="bad" data-result="">Ninguém acertou</button></div>`
-      : `<div class="btns two"><button class="good huge" data-result="${team.id}">Acertou!</button><button class="bad huge" data-result="">Errou</button></div>`;
-
-    if (iAmMimer && S.turn && !wasMimer && S.phase === 'turn') { navigator.vibrate?.([120, 80, 120]); }
-    wasMimer = iAmMimer;
-
-    if (S.phase === 'turn') {
-      if (iAmMimer) {
-        const sq = S.board[team.pos];
-        body = `<img class="art" src="img/hero.jpg" alt=""><h1>Sua vez de fazer mímica!</h1>
-          ${sq.type === 'all' ? '<p class="hint">⚡ Casa “Todos jogam”: qualquer equipe pode adivinhar.</p>' : ''}
-          <p class="hint">Só você vai ver a palavra. Esconda a tela!</p>
-          <div class="btns"><button class="big huge" data-act="draw">Puxar carta</button></div>`;
-      } else {
-        body = `<h2>Vez da <span style="color:${team.color}">${esc(team.name)}</span></h2>
-          <p class="hint">${esc(S.turn.mimerName || 'Alguém')} vai fazer a mímica.</p>${S.message ? `<p class="hint">${esc(S.message)}</p>` : ''}`;
-      }
-    } else if (S.phase === 'card') {
-      if (iAmMimer) {
-        body = `${catHtml}<div class="word">${esc(S.card.word)}</div>${twist}
-          <div class="btns two"><button class="ghost" data-act="swap_card" ${S.card.swapped ? 'disabled' : ''}>${S.card.swapped ? 'Já trocou' : 'Trocar carta'}</button>
-          <button class="good" data-act="go">Começar!</button></div>
-          <p class="hint">Não conhece a palavra? Pode trocar uma vez.</p>`;
-      } else body = `${catHtml}<h2>${esc(S.turn.mimerName)} está lendo a carta…</h2><p class="hint">Preparem-se!</p>`;
-    } else if (S.phase === 'miming' || S.phase === 'timeup') {
-      const timer = `<div class="timer" id="timer">${S.phase === 'timeup' ? 'Tempo!' : ''}</div>`;
-      if (iAmMimer) {
-        body = `${timer}<div class="word hidden-word ${revealWord ? 'show' : ''}" id="w">${esc(S.card.word)}</div>
-          <p class="hint" style="margin:0">Toque na palavra para ver/esconder</p>${twist}${resultBtns}`;
-      } else if (S.card.word) {
-        body = `${timer}${catHtml}<p class="hint">Você é juiz desta rodada. A palavra é:</p><div class="word">${esc(S.card.word)}</div>${twist}
-          <p class="hint">Não sopre a resposta! 🤫</p>`;
-      } else {
-        body = `${timer}${catHtml}${twist}<h1>${S.turn.allPlay ? 'Todo mundo adivinha!' : 'Adivinhe!'}</h1><p class="hint">Grite o palpite em voz alta.</p>`;
-      }
-    } else if (S.phase === 'roll') {
-      const t = S.teams.find((x) => x.id === S.lastRoll.teamId);
-      body = `<h1 style="color:${t.color}">${esc(t.name)} acertou!</h1>
-        <p class="hint">A palavra era <b>${esc(S.lastRoll.word)}</b>. Dado: ${S.lastRoll.value}.</p>
-        ${iAmMimer || myTurn ? '<div class="btns"><button class="big" data-act="next">Próxima equipe</button></div>' : ''}`;
-    } else if (S.phase === 'over') {
-      const t = S.teams.find((x) => x.id === S.winner);
-      body = `<img class="art" src="img/trofeu.jpg" alt=""><h1 style="color:${t.color}">${esc(t.name)} venceu!</h1>
-        <p class="hint">${t.id === me.teamId ? 'Parabéns! 🎉' : 'Fica para a próxima!'}</p>`;
+  // avisos de resultado
+  if (S.result && S.result.id !== lastResultId) {
+    const first = lastResultId === null;
+    lastResultId = S.result.id;
+    if (!first) {
+      if (S.result.kind === 'miss') { Som.play('errou', .6); toast(`<img src="img/tempo.jpg"><h1>Não foi!</h1>`); }
+      else { Som.play('acertou', .7); navigator.vibrate?.([60, 40, 60]); toast(`<img src="img/acertou.jpg"><h1>${S.result.kind === 'steal_hit' ? 'Roubou!' : 'Acertou!'}</h1>`); }
     }
   }
-  if (S.phase !== lastPhase && lastPhase !== null) {
-    if (S.phase === 'card' && S.turn.mimer === me.pid) Som.play('carta');
-    if (S.phase === 'roll') Som.play('acertou', .7);
-    if (S.phase === 'timeup') { Som.play('tempo', .7); navigator.vibrate?.(400); }
+
+  let body = '';
+  if (S.phase === 'lobby' || (!myTeam && !me.judge)) body = lobbyHtml(me, myTeam);
+  else body = gameHtml(me, myTeam);
+
+  if (S.phase !== lastPhase) {
+    if (S.phase === 'miming') revealWord = false;
+    if (S.phase === 'timeup') { Som.play('tempo', .6); navigator.vibrate?.(400); }
     if (S.phase === 'over') Som.play('vitoria', .7);
   }
-  if (S.phase !== lastPhase) revealWord = S.phase === 'miming' ? false : revealWord;
   lastPhase = S.phase;
-  app.innerHTML = top + body;
+  if (document.activeElement?.id === 'newName' && S.phase === 'lobby') return; // não apaga o que está sendo digitado
+  app.innerHTML = body;
   bind();
+  if (S.move && S.move.id !== lastMoveId) {
+    lastMoveId = S.move.id;
+    setTimeout(() => S && render(), Math.max(0, S.move.at + S.move.dur - now()) + 60);
+  }
+}
+
+function lobbyHtml(me, myTeam) {
+  return `<h2>Quem joga neste celular?</h2>
+    <div class="chips">${me.names.map((n, i) => `<span class="chip">${esc(n)}${me.names.length > 1 ? `<button data-rm="${i}" aria-label="Tirar">✕</button>` : ''}</span>`).join('')}</div>
+    <div class="addrow" style="margin-top:10px"><input id="newName" maxlength="20" placeholder="Adicionar outra pessoa"><button id="addName">+</button></div>
+    <h2 style="margin-top:1.2em">Escolha a equipe</h2>
+    <div class="btns">${S.teams.map((t) => `<button class="teambtn ${t.id === me.teamId ? 'mine' : ''}" style="background:${t.color}" data-team="${t.id}">
+      <span>${esc(t.name)}</span><small>${t.people.length} ${t.people.length === 1 ? 'pessoa' : 'pessoas'}</small></button>`).join('')}
+      <button class="ghost ${me.judge ? 'mine' : ''}" data-judge="${me.judge ? '0' : '1'}">${me.judge ? '✓ Você é o juiz (toque para sair)' : '⚖️ Ser o juiz'}</button></div>
+    <p class="hint">${myTeam ? 'Pronto! Esperando a tela principal começar o jogo.' : me.judge ? 'O juiz vê todas as palavras e decide se acertaram.' : 'Toque numa equipe para entrar.'}</p>`;
+}
+
+function cardFlip(card, cls = '') {
+  const c = S.categories[card.cat];
+  return `<div class="card3d ${cls}" style="--cc:${c.color}"><div class="inner">
+    <div class="face front"></div>
+    <div class="face back"><img src="${img(card.cat)}" alt=""><div class="c">${c.emoji} ${esc(c.name)}</div><div class="w">${esc(card.word)}</div></div>
+  </div></div>`;
+}
+
+function gameHtml(me, myTeam) {
+  const team = teamById(S.turn.teamId);
+  const acting = teamById(S.turn.actingId);
+  const mimer = S.turn.mimer;
+  const iAmMimer = mimer && mimer.pid === me.pid;
+  const inActing = myTeam && myTeam.id === acting.id;
+  const anim = moving();
+  const cat = S.card && S.categories[S.card.cat];
+  const twist = S.card?.twist ? `<div style="margin-top:10px"><span class="twist">${esc(S.card.twist)}</span></div>` : '';
+  const steal = S.turn.steal ? `<div class="banner">🔁 Repescagem! ${esc(acting.name)} tenta a mesma carta</div>` : '';
+  const canJudge = S.hasJudge ? me.judge : iAmMimer;
+  const resultBtns = !canJudge ? (S.hasJudge && iAmMimer ? '<p class="hint">⚖️ O juiz decide se acertaram.</p>' : '')
+    : S.turn.allPlay
+      ? `<div class="btns">${S.teams.map((t) => `<button style="background:${t.color};color:#fff" data-result="${t.id}">${esc(t.name)} acertou</button>`).join('')}<button class="bad" data-result="">Ninguém acertou</button></div>`
+      : `<div class="btns two"><button class="good huge" data-result="${acting.id}">Acertou!</button><button class="bad huge" data-result="">Errou</button></div>`;
+
+  if (S.phase === 'turn') {
+    if (inActing) return `${S.message ? `<div class="banner">${esc(S.message)}</div>` : ''}<h1>Vez da sua equipe!</h1>
+      <div class="btns"><button class="big huge" data-act="roll" ${anim ? 'disabled' : ''}>🎲 Jogar o dado</button></div>
+      <p class="hint">Quem fizer a mímica: <b>${esc(mimer?.name || '')}</b></p>`;
+    return `${S.message ? `<div class="banner">${esc(S.message)}</div>` : ''}<h2>Vez da <span style="color:${team.color}">${esc(team.name)}</span></h2><p class="hint">Eles vão jogar o dado.</p>`;
+  }
+  if (S.phase === 'draw') {
+    if (anim) return `<h2>🎲 Tirou ${S.move.value ?? ''}!</h2><p class="hint">Olha o peão andando…</p>`;
+    const sq = S.board[team.pos];
+    const where = sq.type === 'all' ? '<h2>⚡ Todos jogam!</h2>' : sq.cat ? `<div class="pill" style="background:${S.categories[sq.cat].color}">${S.categories[sq.cat].emoji} ${esc(S.categories[sq.cat].name)}</div>` : '';
+    if (iAmMimer) return `${S.message ? `<div class="banner">${esc(S.message)}</div>` : ''}<img class="art pop" src="img/hero.jpg" alt="">
+      <h1>${esc(mimer.name)}, sua vez de fazer mímica!</h1>${where}
+      <p class="hint">Só você vai ver a palavra. Esconda a tela!</p>
+      <div class="btns"><button class="big huge" data-act="draw">Puxar carta</button></div>`;
+    return `${where}<h2>${esc(mimer?.name || 'Alguém')} vai puxar a carta…</h2>`;
+  }
+  if (S.phase === 'card') {
+    if (iAmMimer) {
+      const still = flipShownFor === S.card.word ? 'still' : '';
+      flipShownFor = S.card.word;
+      if (!still) Som.play('carta');
+      return `${steal}${cardFlip(S.card, still)}${twist}
+        <div class="btns two"><button class="ghost" data-act="swap_card" ${S.card.swapped || S.turn.steal ? 'disabled' : ''}>${S.card.swapped ? 'Já trocou' : 'Trocar carta'}</button>
+        <button class="good" data-act="go">Começar!</button></div>
+        ${S.turn.steal ? '' : '<p class="hint">Não conhece a palavra? Pode trocar uma vez.</p>'}`;
+    }
+    if (me.judge && S.card.word) return `${steal}<img class="art" src="${img(S.card.cat)}"><p class="hint">⚖️ A palavra é:</p><div class="word">${esc(S.card.word)}</div>`;
+    return `${steal}<img class="art" src="${img(S.card.cat)}"><h2>${esc(mimer?.name || '')} está lendo a carta…</h2><p class="hint">Preparem-se!</p>`;
+  }
+  if (S.phase === 'miming' || S.phase === 'timeup') {
+    const timer = `<div class="timer" id="timer">${S.phase === 'timeup' ? 'Tempo!' : ''}</div>`;
+    if (iAmMimer) return `${steal}${timer}<div class="word hidden-word ${revealWord ? 'show' : ''}" id="w">${esc(S.card.word)}</div>
+      <p class="hint" style="margin:0">Toque na palavra para ver/esconder</p>${twist}${resultBtns}`;
+    if (S.card.word) return `${steal}${timer}<p class="hint">${me.judge ? '⚖️ Você é o juiz. A palavra é:' : 'Você é juiz desta rodada. A palavra é:'}</p>
+      <div class="word">${esc(S.card.word)}</div>${twist}${me.judge ? resultBtns : '<p class="hint">Não sopre a resposta! 🤫</p>'}`;
+    return `${steal}${timer}<img class="art" src="${img(S.card.cat)}">${twist}<h1>${S.turn.allPlay ? 'Todo mundo adivinha!' : 'Adivinhe!'}</h1><p class="hint">Grite o palpite em voz alta.</p>`;
+  }
+  if (S.phase === 'over') {
+    const t = teamById(S.winner);
+    return `<img class="art pop" src="img/trofeu.jpg" alt=""><h1 style="color:${t.color}">${esc(t.name)} venceu!</h1>
+      <p class="hint">${t.id === me.teamId ? 'Parabéns! 🎉' : 'Fica para a próxima!'}</p>`;
+  }
+  return '';
 }
 
 function bind() {
   app.querySelectorAll('[data-team]').forEach((b) => (b.onclick = () => { Som.play('pop'); send({ t: 'join_team', teamId: b.dataset.team }); }));
+  app.querySelectorAll('[data-judge]').forEach((b) => (b.onclick = () => { Som.play('pop'); send({ t: 'be_judge', on: b.dataset.judge === '1' }); }));
   app.querySelectorAll('[data-act]').forEach((b) => (b.onclick = () => send({ t: b.dataset.act })));
   app.querySelectorAll('[data-result]').forEach((b) => (b.onclick = () => send({ t: 'result', teamId: b.dataset.result || null })));
+  app.querySelectorAll('[data-rm]').forEach((b) => (b.onclick = () => { names.splice(+b.dataset.rm, 1); saveNames(); send({ t: 'names', names }); }));
+  const add = document.getElementById('addName');
+  if (add) {
+    const inp = document.getElementById('newName');
+    const go = () => { const v = inp.value.trim(); if (!v) return; names.push(v); saveNames(); Som.play('pop'); send({ t: 'names', names }); };
+    add.onclick = go;
+    inp.onkeydown = (e) => e.key === 'Enter' && go();
+  }
   const w = document.getElementById('w');
   if (w) w.onclick = () => { revealWord = !revealWord; w.classList.toggle('show', revealWord); };
-  const rn = document.getElementById('rename');
-  if (rn) rn.onclick = () => {
-    const v = prompt('Seu nome:', S.you.name);
-    if (v && v.trim()) { name = v.trim(); store('mimica_player', { ...store('mimica_player'), name }); send({ t: 'rename', name }); }
-  };
 }
 
 let lastSec = null;
@@ -171,10 +274,10 @@ setInterval(() => {
   if (!S || S.phase !== 'miming') return;
   const t = document.getElementById('timer');
   if (!t) return;
-  const sec = Math.max(0, Math.ceil((S.timerEnd - (Date.now() + net.offset)) / 1000));
+  const sec = Math.max(0, Math.ceil((S.timerEnd - now()) / 1000));
   t.textContent = sec;
   t.classList.toggle('low', sec <= 10);
-  if (sec !== lastSec && sec <= 5 && sec > 0 && S.turn.mimer === S.you.pid) Som.play('tique', .6);
+  if (sec !== lastSec && sec <= 5 && sec > 0 && S.turn.mimer?.pid === S.you.pid) Som.play('tique', .6);
   lastSec = sec;
 }, 200);
 </script>
