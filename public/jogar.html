@@ -3,23 +3,24 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#1b1035">
-<title>Mimicaço · Jogador</title>
+<meta name="theme-color" content="#123a7a">
+<title>Mimicaço da Turma do Rawzinho</title>
 <link rel="stylesheet" href="style.css">
 <style>
-  body { min-height: 100dvh; }
-  body.tc { background: radial-gradient(circle at 50% -10%, color-mix(in srgb, var(--tc) 55%, #1b1035) 0%, var(--bg) 70%) fixed; }
+  body { min-height: 100dvh; background: #8fd16a url(img/fundo_celular.jpg) center top/cover fixed; }
+  main::before { content: ''; position: fixed; inset: 0; z-index: -1; background: linear-gradient(180deg, rgba(18,58,122,.55), rgba(18,58,122,.85)); }
+  body.tc main::before { background: linear-gradient(180deg, color-mix(in srgb, var(--tc) 70%, transparent), rgba(18,58,122,.88) 55%); }
   main { max-width: 480px; margin: 0 auto; padding: 16px 16px 32px; text-align: center; }
   .top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; font-size: .95rem; }
   .me { display: flex; gap: 8px; align-items: center; }
   .me .dot { width: 16px; height: 16px; border-radius: 50%; background: var(--tc, #888); }
-  .teambtn { width: 100%; font-size: 1.3rem; padding: .9em; color: #1b1035; display: flex; justify-content: space-between; }
+  .teambtn { width: 100%; font-size: 1.3rem; padding: .9em; color: #123a7a; display: flex; justify-content: space-between; }
   .teambtn small { font-weight: 600; opacity: .7; }
   .teambtn.mine { outline: 4px solid #fff; }
-  .art { width: 46vw; max-width: 200px; aspect-ratio: 1; border-radius: 50%; object-fit: cover; box-shadow: 0 10px 0 rgba(0,0,0,.25); margin: 6px auto 12px; display: block; }
-  .word { font-size: clamp(2rem, 11vw, 3.2rem); font-weight: 800; line-height: 1.05; margin: .3em 0; color: var(--accent); word-break: break-word; }
+  .art { width: 46vw; max-width: 200px; aspect-ratio: 1; border-radius: 50%; object-fit: cover; border: 5px solid #fff; box-shadow: 0 8px 0 rgba(10,30,70,.35); margin: 6px auto 12px; display: block; }
+  .word { font-family: 'Lilita One', sans-serif; font-size: clamp(2rem, 11vw, 3.2rem); line-height: 1.05; margin: .3em 0; color: var(--accent); word-break: break-word; }
   .twist { display: inline-block; background: var(--bad); color: #fff; font-weight: 800; padding: .25em .9em; border-radius: 999px; }
-  .timer { font-size: 3.6rem; font-weight: 800; line-height: 1; }
+  .timer { font-family: 'Lilita One', sans-serif; font-size: 3.6rem; line-height: 1; }
   .timer.low { color: var(--bad); }
   .btns { display: grid; gap: 10px; margin-top: 16px; }
   .btns.two { grid-template-columns: 1fr 1fr; }
@@ -45,9 +46,12 @@ const img = (k) => `img/${k}.jpg`;
 
 if (!code) location.href = '/';
 if (!name) askName(); else start();
+Som.unlock(false);
+Som.button(false);
 
 function askName() {
   app.innerHTML = `<div class="stack" style="padding-top:10vh">
+    <img src="img/logo.png" alt="Turma do Rawzinho" style="width:min(300px,80vw)">
     <img class="art" src="img/hero.jpg" alt="">
     <h2>Sala ${esc(code)}</h2>
     <input id="nm" maxlength="20" placeholder="Seu nome" autofocus>
@@ -100,7 +104,7 @@ function render() {
     if (S.phase === 'turn') {
       if (iAmMimer) {
         const sq = S.board[team.pos];
-        body = `<img class="art" src="img/acao.jpg" alt=""><h1>Sua vez de fazer mímica!</h1>
+        body = `<img class="art" src="img/hero.jpg" alt=""><h1>Sua vez de fazer mímica!</h1>
           ${sq.type === 'all' ? '<p class="hint">⚡ Casa “Todos jogam”: qualquer equipe pode adivinhar.</p>' : ''}
           <p class="hint">Só você vai ver a palavra. Esconda a tela!</p>
           <div class="btns"><button class="big huge" data-act="draw">Puxar carta</button></div>`;
@@ -137,6 +141,12 @@ function render() {
         <p class="hint">${t.id === me.teamId ? 'Parabéns! 🎉' : 'Fica para a próxima!'}</p>`;
     }
   }
+  if (S.phase !== lastPhase && lastPhase !== null) {
+    if (S.phase === 'card' && S.turn.mimer === me.pid) Som.play('carta');
+    if (S.phase === 'roll') Som.play('acertou', .7);
+    if (S.phase === 'timeup') { Som.play('tempo', .7); navigator.vibrate?.(400); }
+    if (S.phase === 'over') Som.play('vitoria', .7);
+  }
   if (S.phase !== lastPhase) revealWord = S.phase === 'miming' ? false : revealWord;
   lastPhase = S.phase;
   app.innerHTML = top + body;
@@ -144,7 +154,7 @@ function render() {
 }
 
 function bind() {
-  app.querySelectorAll('[data-team]').forEach((b) => (b.onclick = () => send({ t: 'join_team', teamId: b.dataset.team })));
+  app.querySelectorAll('[data-team]').forEach((b) => (b.onclick = () => { Som.play('pop'); send({ t: 'join_team', teamId: b.dataset.team }); }));
   app.querySelectorAll('[data-act]').forEach((b) => (b.onclick = () => send({ t: b.dataset.act })));
   app.querySelectorAll('[data-result]').forEach((b) => (b.onclick = () => send({ t: 'result', teamId: b.dataset.result || null })));
   const w = document.getElementById('w');
@@ -164,7 +174,7 @@ setInterval(() => {
   const sec = Math.max(0, Math.ceil((S.timerEnd - (Date.now() + net.offset)) / 1000));
   t.textContent = sec;
   t.classList.toggle('low', sec <= 10);
-  if (sec !== lastSec && sec === 0) navigator.vibrate?.(400);
+  if (sec !== lastSec && sec <= 5 && sec > 0 && S.turn.mimer === S.you.pid) Som.play('tique', .6);
   lastSec = sec;
 }, 200);
 </script>

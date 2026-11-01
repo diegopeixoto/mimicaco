@@ -1,25 +1,28 @@
 @import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&display=swap');
+@font-face { font-family: 'Lilita One'; src: url(fonte/LilitaOne-Regular.ttf) format('truetype'); font-display: swap; }
 
 :root {
-  --bg: #1b1035;
-  --bg2: #2a1a52;
-  --card: #34226a;
-  --ink: #fff8ec;
-  --muted: #c9b8f0;
+  --bg: #123a7a;
+  --bg2: #1d4fa3;
+  --card: rgba(18, 52, 120, .88);
+  --ink: #ffffff;
+  --muted: #cfe3ff;
   --accent: #ffd23d;
-  --good: #2fcf7a;
-  --bad: #ff4d6d;
+  --leaf: #7ed321;
+  --good: #4cc94a;
+  --bad: #ff5a5f;
   --radius: 18px;
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; min-height: 100%; }
 body {
   font-family: 'Baloo 2', system-ui, sans-serif;
-  background: radial-gradient(circle at 20% 0%, #3b2178 0%, var(--bg) 60%) fixed;
+  background: #8fd16a url(img/fundo.jpg) center/cover fixed;
   color: var(--ink);
   -webkit-tap-highlight-color: transparent;
 }
-h1, h2, h3 { margin: 0 0 .4em; line-height: 1.1; }
+h1, h2, h3 { margin: 0 0 .4em; line-height: 1.1; font-family: 'Lilita One', 'Baloo 2', sans-serif; font-weight: 400; letter-spacing: .01em; }
+.panel { border: 3px solid rgba(255,255,255,.35); box-shadow: 0 8px 0 rgba(10,30,70,.35); }
 button, input, select {
   font: inherit;
   border: 0;
@@ -27,8 +30,10 @@ button, input, select {
 }
 button {
   background: var(--accent);
-  color: #1b1035;
-  font-weight: 800;
+  color: #123a7a;
+  font-family: 'Lilita One', 'Baloo 2', sans-serif;
+  font-weight: 400;
+  letter-spacing: .02em;
   padding: .7em 1.2em;
   cursor: pointer;
   box-shadow: 0 4px 0 rgba(0,0,0,.35);
@@ -36,21 +41,23 @@ button {
 }
 button:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0,0,0,.35); }
 button:disabled { opacity: .45; }
-button.ghost { background: transparent; color: var(--muted); box-shadow: none; border: 2px solid #4c3790; }
-button.good { background: var(--good); }
+button.ghost { background: rgba(255,255,255,.12); color: #fff; box-shadow: none; border: 2px solid rgba(255,255,255,.5); }
+button.good { background: var(--good); color: #fff; }
 button.bad { background: var(--bad); color: #fff; }
 button.big { font-size: 1.4rem; padding: .9em 1.2em; width: 100%; }
-input, select { background: #fff; color: #1b1035; padding: .7em 1em; width: 100%; }
+input, select { background: #fff; color: #123a7a; padding: .7em 1em; width: 100%; }
 .muted { color: var(--muted); }
 .row { display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; }
 .stack > * + * { margin-top: .8rem; }
 .panel { background: var(--card); border-radius: var(--radius); padding: 1.1rem; }
 .logo { font-weight: 800; letter-spacing: -.02em; }
 .logo span { color: var(--accent); }
-.pill { display: inline-block; padding: .1em .7em; border-radius: 999px; font-weight: 700; color: #1b1035; }
+.pill { display: inline-block; padding: .1em .7em; border-radius: 999px; font-weight: 700; color: #123a7a; }
 .offline::after {
   content: 'Reconectando…';
   position: fixed; top: 10px; left: 50%; transform: translateX(-50%);
   background: var(--bad); color: #fff; padding: .3em 1em; border-radius: 999px; z-index: 99; font-weight: 700;
 }
 .hidden { display: none !important; }
+
+.sound-toggle { position: fixed; right: 12px; bottom: 12px; z-index: 70; width: 52px; height: 52px; padding: 0; border-radius: 50%; font-size: 1.5rem; }

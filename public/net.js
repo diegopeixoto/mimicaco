@@ -49,3 +49,61 @@ function beep(freq = 880, ms = 150) {
     o.start(); o.stop(ctx.currentTime + ms / 1000);
   } catch {}
 }
+
+// ---------- Sons (ElevenLabs) ----------
+const Som = (() => {
+  const cache = {};
+  let on = true, music = null, unlocked = false, voiceBusy = null;
+  try { on = localStorage.getItem('mimica_som') !== 'off'; } catch {}
+  function get(name) {
+    if (!cache[name]) { cache[name] = new Audio(`som/${name}.mp3`); cache[name].preload = 'auto'; }
+    return cache[name];
+  }
+  function play(name, vol = 0.8) {
+    if (!on) return;
+    try { const a = get(name).cloneNode(); a.volume = vol; a.play().catch(() => {}); return a; } catch {}
+  }
+  // falas do Rawzinho: abaixa a música enquanto ele fala, uma fala por vez
+  function voz(name, delay = 0) {
+    if (!on) return;
+    setTimeout(() => {
+      if (voiceBusy) { try { voiceBusy.pause(); } catch {} }
+      const a = play('voz_' + name, 1);
+      if (!a) return;
+      voiceBusy = a;
+      if (music) music.volume = 0.12;
+      a.onended = () => { if (voiceBusy === a) { voiceBusy = null; if (music) music.volume = 0.35; } };
+    }, delay);
+  }
+  function startMusic() {
+    if (!on || music) return;
+    music = new Audio('som/musica.mp3');
+    music.loop = true; music.volume = 0.35;
+    music.play().catch(() => { music = null; });
+  }
+  function stopMusic() { if (music) { music.pause(); music = null; } }
+  function toggle() {
+    on = !on;
+    try { localStorage.setItem('mimica_som', on ? 'on' : 'off'); } catch {}
+    if (!on) stopMusic();
+    return on;
+  }
+  // navegadores só tocam som depois de um toque na tela
+  function unlock(withMusic, cb) {
+    const go = () => {
+      if (unlocked) return; unlocked = true;
+      if (withMusic) startMusic();
+      cb && cb();
+    };
+    ['pointerdown', 'keydown'].forEach((ev) => addEventListener(ev, go, { once: true }));
+  }
+  function button(withMusic) {
+    const b = document.createElement('button');
+    b.className = 'sound-toggle ghost';
+    const draw = () => (b.textContent = on ? '🔊' : '🔇');
+    draw();
+    b.onclick = (e) => { e.stopPropagation(); toggle(); if (on && withMusic) startMusic(); draw(); };
+    document.body.appendChild(b);
+  }
+  return { play, voz, startMusic, stopMusic, toggle, unlock, button, get on() { return on; } };
+})();
