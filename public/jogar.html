@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1b1035">
+<title>Mimicaço · Jogador</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  body { min-height: 100dvh; }
+  body.tc { background: radial-gradient(circle at 50% -10%, color-mix(in srgb, var(--tc) 55%, #1b1035) 0%, var(--bg) 70%) fixed; }
+  main { max-width: 480px; margin: 0 auto; padding: 16px 16px 32px; text-align: center; }
+  .top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; font-size: .95rem; }
+  .me { display: flex; gap: 8px; align-items: center; }
+  .me .dot { width: 16px; height: 16px; border-radius: 50%; background: var(--tc, #888); }
+  .teambtn { width: 100%; font-size: 1.3rem; padding: .9em; color: #1b1035; display: flex; justify-content: space-between; }
+  .teambtn small { font-weight: 600; opacity: .7; }
+  .teambtn.mine { outline: 4px solid #fff; }
+  .art { width: 46vw; max-width: 200px; aspect-ratio: 1; border-radius: 50%; object-fit: cover; box-shadow: 0 10px 0 rgba(0,0,0,.25); margin: 6px auto 12px; display: block; }
+  .word { font-size: clamp(2rem, 11vw, 3.2rem); font-weight: 800; line-height: 1.05; margin: .3em 0; color: var(--accent); word-break: break-word; }
+  .twist { display: inline-block; background: var(--bad); color: #fff; font-weight: 800; padding: .25em .9em; border-radius: 999px; }
+  .timer { font-size: 3.6rem; font-weight: 800; line-height: 1; }
+  .timer.low { color: var(--bad); }
+  .btns { display: grid; gap: 10px; margin-top: 16px; }
+  .btns.two { grid-template-columns: 1fr 1fr; }
+  .hint { color: var(--muted); font-size: 1.05rem; }
+  .huge { font-size: 1.8rem; padding: 1em; }
+  .hidden-word { filter: blur(14px); transition: filter .2s; user-select: none; }
+  .hidden-word.show { filter: none; }
+</style>
+</head>
+<body>
+<main id="app"><p class="hint">Conectando…</p></main>
+<script src="net.js"></script>
+<script>
+const params = new URLSearchParams(location.search);
+const code = (params.get('sala') || '').toUpperCase();
+const saved = store('mimica_player') || {};
+const pid = saved.pid || (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2));
+store('mimica_player', { ...saved, pid });
+let name = saved.name;
+let S = null, net = null, lastPhase = null, wasMimer = false, revealWord = false;
+const app = document.getElementById('app');
+const img = (k) => `img/${k}.jpg`;
+
+if (!code) location.href = '/';
+if (!name) askName(); else start();
+
+function askName() {
+  app.innerHTML = `<div class="stack" style="padding-top:10vh">
+    <img class="art" src="img/hero.jpg" alt="">
+    <h2>Sala ${esc(code)}</h2>
+    <input id="nm" maxlength="20" placeholder="Seu nome" autofocus>
+    <button class="big" id="ok">Entrar</button></div>`;
+  const go = () => {
+    const v = document.getElementById('nm').value.trim();
+    if (!v) return;
+    name = v; store('mimica_player', { ...store('mimica_player'), name });
+    start();
+  };
+  document.getElementById('ok').onclick = go;
+  document.getElementById('nm').onkeydown = (e) => e.key === 'Enter' && go();
+}
+
+function start() {
+  net = connect(() => ({ code, pid, name }), (st) => { S = st; render(); }, (err) => {
+    app.innerHTML = `<div class="stack" style="padding-top:20vh"><h2>Ops!</h2><p>${esc(err)}</p><button onclick="location.href='/'">Voltar</button></div>`;
+  });
+}
+const send = (m) => net.send(m);
+
+function render() {
+  const me = S.you;
+  const myTeam = S.teams.find((t) => t.id === me.teamId);
+  document.body.classList.toggle('tc', !!myTeam);
+  if (myTeam) document.body.style.setProperty('--tc', myTeam.color);
+  const top = `<div class="top"><div class="me"><span class="dot"></span><b>${esc(me.name)}</b>${myTeam ? `<span class="muted">· ${esc(myTeam.name)}</span>` : ''}</div><div class="muted">Sala ${esc(S.code)}</div></div>`;
+  let body = '';
+
+  if (S.phase === 'lobby' || !myTeam) {
+    body = `<h2>Escolha sua equipe</h2>
+      <div class="btns">${S.teams.map((t) => `<button class="teambtn ${t.id === me.teamId ? 'mine' : ''}" style="background:${t.color}" data-team="${t.id}">
+        <span>${esc(t.name)}</span><small>${t.players.length} ${t.players.length === 1 ? 'pessoa' : 'pessoas'}</small></button>`).join('')}</div>
+      <p class="hint">${myTeam ? 'Pronto! Esperando a tela principal começar o jogo.' : 'Toque numa equipe para entrar.'}</p>
+      <button class="ghost" id="rename">Trocar meu nome</button>`;
+  } else {
+    const team = S.teams.find((t) => t.id === S.turn.teamId);
+    const iAmMimer = S.turn.mimer === me.pid;
+    const myTurn = team.id === me.teamId;
+    const cat = S.card && S.categories[S.card.cat];
+    const catHtml = cat ? `<img class="art" src="${img(S.card.cat)}" alt=""><div class="pill" style="background:${cat.color}">${cat.emoji} ${esc(cat.name)}</div>` : '';
+    const twist = S.card?.twist ? `<div style="margin-top:10px"><span class="twist">${esc(S.card.twist)}</span></div>` : '';
+    const resultBtns = S.turn.allPlay
+      ? `<div class="btns">${S.teams.map((t) => `<button style="background:${t.color}" data-result="${t.id}">${esc(t.name)} acertou</button>`).join('')}<button class="bad" data-result="">Ninguém acertou</button></div>`
+      : `<div class="btns two"><button class="good huge" data-result="${team.id}">Acertou!</button><button class="bad huge" data-result="">Errou</button></div>`;
+
+    if (iAmMimer && S.turn && !wasMimer && S.phase === 'turn') { navigator.vibrate?.([120, 80, 120]); }
+    wasMimer = iAmMimer;
+
+    if (S.phase === 'turn') {
+      if (iAmMimer) {
+        const sq = S.board[team.pos];
+        body = `<img class="art" src="img/acao.jpg" alt=""><h1>Sua vez de fazer mímica!</h1>
+          ${sq.type === 'all' ? '<p class="hint">⚡ Casa “Todos jogam”: qualquer equipe pode adivinhar.</p>' : ''}
+          <p class="hint">Só você vai ver a palavra. Esconda a tela!</p>
+          <div class="btns"><button class="big huge" data-act="draw">Puxar carta</button></div>`;
+      } else {
+        body = `<h2>Vez da <span style="color:${team.color}">${esc(team.name)}</span></h2>
+          <p class="hint">${esc(S.turn.mimerName || 'Alguém')} vai fazer a mímica.</p>${S.message ? `<p class="hint">${esc(S.message)}</p>` : ''}`;
+      }
+    } else if (S.phase === 'card') {
+      if (iAmMimer) {
+        body = `${catHtml}<div class="word">${esc(S.card.word)}</div>${twist}
+          <div class="btns two"><button class="ghost" data-act="swap_card" ${S.card.swapped ? 'disabled' : ''}>${S.card.swapped ? 'Já trocou' : 'Trocar carta'}</button>
+          <button class="good" data-act="go">Começar!</button></div>
+          <p class="hint">Não conhece a palavra? Pode trocar uma vez.</p>`;
+      } else body = `${catHtml}<h2>${esc(S.turn.mimerName)} está lendo a carta…</h2><p class="hint">Preparem-se!</p>`;
+    } else if (S.phase === 'miming' || S.phase === 'timeup') {
+      const timer = `<div class="timer" id="timer">${S.phase === 'timeup' ? 'Tempo!' : ''}</div>`;
+      if (iAmMimer) {
+        body = `${timer}<div class="word hidden-word ${revealWord ? 'show' : ''}" id="w">${esc(S.card.word)}</div>
+          <p class="hint" style="margin:0">Toque na palavra para ver/esconder</p>${twist}${resultBtns}`;
+      } else if (S.card.word) {
+        body = `${timer}${catHtml}<p class="hint">Você é juiz desta rodada. A palavra é:</p><div class="word">${esc(S.card.word)}</div>${twist}
+          <p class="hint">Não sopre a resposta! 🤫</p>`;
+      } else {
+        body = `${timer}${catHtml}${twist}<h1>${S.turn.allPlay ? 'Todo mundo adivinha!' : 'Adivinhe!'}</h1><p class="hint">Grite o palpite em voz alta.</p>`;
+      }
+    } else if (S.phase === 'roll') {
+      const t = S.teams.find((x) => x.id === S.lastRoll.teamId);
+      body = `<h1 style="color:${t.color}">${esc(t.name)} acertou!</h1>
+        <p class="hint">A palavra era <b>${esc(S.lastRoll.word)}</b>. Dado: ${S.lastRoll.value}.</p>
+        ${iAmMimer || myTurn ? '<div class="btns"><button class="big" data-act="next">Próxima equipe</button></div>' : ''}`;
+    } else if (S.phase === 'over') {
+      const t = S.teams.find((x) => x.id === S.winner);
+      body = `<img class="art" src="img/trofeu.jpg" alt=""><h1 style="color:${t.color}">${esc(t.name)} venceu!</h1>
+        <p class="hint">${t.id === me.teamId ? 'Parabéns! 🎉' : 'Fica para a próxima!'}</p>`;
+    }
+  }
+  if (S.phase !== lastPhase) revealWord = S.phase === 'miming' ? false : revealWord;
+  lastPhase = S.phase;
+  app.innerHTML = top + body;
+  bind();
+}
+
+function bind() {
+  app.querySelectorAll('[data-team]').forEach((b) => (b.onclick = () => send({ t: 'join_team', teamId: b.dataset.team })));
+  app.querySelectorAll('[data-act]').forEach((b) => (b.onclick = () => send({ t: b.dataset.act })));
+  app.querySelectorAll('[data-result]').forEach((b) => (b.onclick = () => send({ t: 'result', teamId: b.dataset.result || null })));
+  const w = document.getElementById('w');
+  if (w) w.onclick = () => { revealWord = !revealWord; w.classList.toggle('show', revealWord); };
+  const rn = document.getElementById('rename');
+  if (rn) rn.onclick = () => {
+    const v = prompt('Seu nome:', S.you.name);
+    if (v && v.trim()) { name = v.trim(); store('mimica_player', { ...store('mimica_player'), name }); send({ t: 'rename', name }); }
+  };
+}
+
+let lastSec = null;
+setInterval(() => {
+  if (!S || S.phase !== 'miming') return;
+  const t = document.getElementById('timer');
+  if (!t) return;
+  const sec = Math.max(0, Math.ceil((S.timerEnd - (Date.now() + net.offset)) / 1000));
+  t.textContent = sec;
+  t.classList.toggle('low', sec <= 10);
+  if (sec !== lastSec && sec === 0) navigator.vibrate?.(400);
+  lastSec = sec;
+}, 200);
+</script>
+</body>
+</html>

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mimicaço</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  body { background: #1b1035 url(img/fundo.jpg) center/cover fixed; }
+  main { max-width: 440px; margin: 0 auto; padding: 5vh 16px 32px; text-align: center; }
+  .logo { font-size: 3.4rem; }
+  .tag { font-size: 1.15rem; text-shadow: 0 2px 6px rgba(0,0,0,.6); margin-bottom: 2rem; }
+  .code { text-transform: uppercase; text-align: center; font-size: 1.6rem; letter-spacing: .3em; font-weight: 800; }
+</style>
+</head>
+<body>
+<main class="stack">
+  <img src="img/hero.jpg" alt="" style="width:180px;height:180px;border-radius:50%;object-fit:cover;box-shadow:0 10px 0 rgba(0,0,0,.25)">
+  <div class="logo">Mimic<span>aço</span></div>
+  <p class="tag muted">Mímica em equipes. Uma tela mostra o tabuleiro, cada celular vira o controle do jogador.</p>
+
+  <div class="panel stack">
+    <h3>Vou jogar pelo celular</h3>
+    <input id="code" class="code" maxlength="4" placeholder="CÓDIGO" autocomplete="off">
+    <input id="name" maxlength="20" placeholder="Seu nome">
+    <button class="big" id="join">Entrar na sala</button>
+  </div>
+
+  <div class="panel stack">
+    <h3>Esta é a tela principal</h3>
+    <p class="muted" style="margin:0">Abra na TV, no notebook ou num celular que fique à vista de todos.</p>
+    <button class="big ghost" id="create">Criar sala nova</button>
+  </div>
+</main>
+<script src="net.js"></script>
+<script>
+  const last = store('mimica_player');
+  if (last?.name) document.getElementById('name').value = last.name;
+  document.getElementById('join').onclick = () => {
+    const code = document.getElementById('code').value.trim().toUpperCase();
+    const name = document.getElementById('name').value.trim();
+    if (code.length !== 4) return alert('Digite o código de 4 letras que aparece na tela principal.');
+    if (!name) return alert('Digite seu nome.');
+    store('mimica_player', { ...(last || {}), name });
+    location.href = 'jogar.html?sala=' + code;
+  };
+  document.getElementById('create').onclick = async () => {
+    const r = await fetch('/api/new', { method: 'POST' }).then((r) => r.json());
+    store('mimica_host_' + r.code, r.hostKey);
+    location.href = 'tela.html?sala=' + r.code;
+  };
+</script>
+</body>
+</html>
