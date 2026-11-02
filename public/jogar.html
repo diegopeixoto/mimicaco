@@ -65,6 +65,7 @@
   <div id="app"><p class="hint">Conectando…</p></div>
 </main>
 <div class="toast" id="toast"></div>
+<script src="rodape.js"></script>
 <script src="net.js"></script>
 <script src="rive-fx.js"></script>
 <script type="module">
@@ -94,6 +95,7 @@ function askName() {
     <input id="nm" maxlength="20" placeholder="Seu nome" autofocus>
     <button class="big" id="ok">Entrar</button>
     <p class="hint">Vão jogar várias pessoas neste celular? Depois de entrar dá para adicionar mais nomes.</p>
+    ${canalYT('Conheça a turma no YouTube')}
     <p class="hint">Use só nome ou apelido. Ao entrar, você concorda com os <a href="termos.html" style="color:inherit">Termos de uso</a> e a <a href="privacidade.html" style="color:inherit">Política de privacidade</a>.</p></div>`;
   const go = () => {
     const v = document.getElementById('nm').value.trim();
@@ -204,7 +206,8 @@ function lobbyHtml(me, myTeam) {
     <div class="btns">${S.teams.map((t) => `<button class="teambtn ${t.id === me.teamId ? 'mine' : ''}" style="background:${t.color}" data-team="${t.id}">
       <span>${esc(t.name)}</span><small>${t.people.length} ${t.people.length === 1 ? 'pessoa' : 'pessoas'}</small></button>`).join('')}
       <button class="ghost ${me.judge ? 'mine' : ''}" data-judge="${me.judge ? '0' : '1'}">${me.judge ? '✓ Você é o juiz (toque para sair)' : '⚖️ Ser o juiz'}</button></div>
-    <p class="hint">${myTeam ? 'Pronto! Esperando a tela principal começar o jogo.' : me.judge ? 'O juiz vê todas as palavras e decide se acertaram.' : 'Toque numa equipe para entrar.'}</p>`;
+    <p class="hint">${myTeam ? 'Pronto! Esperando a tela principal começar o jogo.' : me.judge ? 'O juiz vê todas as palavras e decide se acertaram.' : 'Toque numa equipe para entrar.'}</p>
+    <div style="text-align:center;margin-top:18px">${canalYT('Enquanto espera, assista à turma no YouTube')}</div>`;
 }
 
 function cardFlip(card, cls = '') {
