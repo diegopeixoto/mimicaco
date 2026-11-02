@@ -15,7 +15,7 @@ const THEMES = {
   },
   familia: {
     hemi: [0xffe9cc, 0x3aa7b8, 1.0], sun: [0xffcf8a, 2.4], exposure: 1.0,
-    layers: [[0xf3d793, 0xe2bb72], [0x7ccf4a, 0xc79a5a], [0x9a6b3f, 0x7d5330]],
+    layers: [[0xe8c376, 0xd9ab5e], [0x7ccf4a, 0xc79a5a], [0x9a6b3f, 0x7d5330]],
     stone: 0xffffff, deco: 'tropical', clouds: true, water: 0x29c3d6, mascots: [['model/rawzinho.glb', 2.0], ['model/burrinho.glb', 1.9]], fill: 0xffe2c0, rim: 0xffb070,
   },
   adulto: {
@@ -459,13 +459,9 @@ export async function createBoard(container, opts = {}) {
       // árvores de verdade na borda do jardim
       const trees = ['arvore_redonda', 'carvalho', 'arvore_rosa', 'pinheiro', 'arvore_redonda', 'carvalho'];
       // só nas bordas de trás e dos lados, pra não tampar as casas
-      for (let i = 0, n = 0; i < 80 && n < (low ? 7 : 12); i++) {
-        const p = spot(1.3, 0, 0.7);
-        if (!p) continue;
-        const edge = Math.min(p[0] - x0, x0 + w - p[0], p[1] - z0);
-        if (edge > 1.1 || p[1] > z0 + h * 0.7) { taken.pop(); continue; }
-        placeProp(trees[n % trees.length], p[0], p[1], 0.7 + r() * 0.35, r() * 6);
-        n++;
+      for (let n = 0; n < (low ? 7 : 12); n++) {
+        const p = edgeSpot(1.3, 0.7);
+        if (p) placeProp(trees[n % trees.length], p[0], p[1], 0.7 + r() * 0.35, r() * 6);
       }
       for (let i = 0; i < (low ? 3 : 6); i++) {
         const p = spot(0.8, 0, 0.35);
@@ -481,9 +477,9 @@ export async function createBoard(container, opts = {}) {
       }
     } else if (TH.deco === 'tropical') {
       tropical();
-      for (let i = 0; i < (low ? 6 : 10); i++) {
-        const p = spot(1.3, 0.75);
-        if (p) placeProp(['palmeira', 'coqueiro', 'bananeira'][i % 3], p[0], p[1], 0.75 + r() * 0.45, r() * 6);
+      for (let i = 0; i < (low ? 5 : 8); i++) {
+        const p = edgeSpot(1.3, 0.8);
+        if (p) placeProp(['palmeira', 'coqueiro', 'bananeira'][i % 3], p[0], p[1], 0.7 + r() * 0.35, r() * 6);
       }
       for (let i = 0; i < 8; i++) {
         const p = spot(0.9);
@@ -532,6 +528,18 @@ export async function createBoard(container, opts = {}) {
         if (edgeBias && edge > 1.6 && r() < edgeBias) continue;
         if (room) taken.push([x, z, room]);
         return [x, z];
+      }
+      return null;
+    }
+
+    // lugar na borda de trás ou dos lados (enfeite alto não tampa as casas)
+    function edgeSpot(minD, room) {
+      for (let i = 0; i < 80; i++) {
+        const p = spot(minD, 0, room);
+        if (!p) continue;
+        const edge = Math.min(p[0] - x0, x0 + w - p[0], p[1] - z0);
+        if (edge > 1.1 || p[1] > z0 + h * 0.7) { taken.pop(); continue; }
+        return p;
       }
       return null;
     }
@@ -633,9 +641,9 @@ export async function createBoard(container, opts = {}) {
     }
 
     function tropical() {
-      for (let i = 0; i < (low ? 3 : 5); i++) {
-        const p = spot(1.25, 0.8);
-        if (p) palm(p[0], p[1], 0.9 + r() * 0.5);
+      for (let i = 0; i < (low ? 2 : 4); i++) {
+        const p = edgeSpot(1.3, 0.8);
+        if (p) palm(p[0], p[1], 0.9 + r() * 0.4);
       }
       const hib = [0xff4f7a, 0xffb02e, 0xff6fb5, 0xffffff];
       const fg = new THREE.SphereGeometry(0.08, 8, 6);
@@ -648,12 +656,12 @@ export async function createBoard(container, opts = {}) {
       }
       // conchas e pedras de praia
       const shellMat = new THREE.MeshStandardMaterial({ color: 0xffd2c2, roughness: 0.5 });
-      const rockMat = new THREE.MeshStandardMaterial({ color: 0x9a8f86, roughness: 0.9, flatShading: true });
+      const rockMat = new THREE.MeshStandardMaterial({ color: 0xb5a89a, roughness: 0.9 });
       for (let i = 0; i < 14; i++) {
         const p = spot(1.0);
         if (!p) continue;
         const shell = i % 2 === 0;
-        const m = new THREE.Mesh(shell ? new THREE.ConeGeometry(0.12, 0.08, 9) : new THREE.DodecahedronGeometry(0.18 + r() * 0.15), shell ? shellMat : rockMat);
+        const m = new THREE.Mesh(shell ? new THREE.ConeGeometry(0.12, 0.08, 9) : new THREE.SphereGeometry(0.14 + r() * 0.1, 10, 7), shell ? shellMat : rockMat);
         m.position.set(p[0], shell ? -0.2 : -0.15, p[1]);
         m.rotation.y = r() * 6;
         m.castShadow = true;
@@ -819,7 +827,7 @@ export async function createBoard(container, opts = {}) {
       const kindTop = kindOf(color);
       const m = new THREE.Mesh(geo, [
         // grama em cor lisa: as casas se destacam melhor
-        kindTop === 'grass' ? new THREE.MeshStandardMaterial({ color, roughness: 0.95 }) : new THREE.MeshStandardMaterial({ map: groundTexture(color, kindTop), roughness: 0.92 }),
+        kindTop !== 'dirt' ? new THREE.MeshStandardMaterial({ color, roughness: 0.95 }) : new THREE.MeshStandardMaterial({ map: groundTexture(color, kindTop), roughness: 0.92 }),
         new THREE.MeshStandardMaterial({ map: groundTexture(side, new THREE.Color(side).r > 0.6 ? 'sand' : 'dirt'), roughness: 0.95 })]);
       m.position.y = y;
       m.scale.set(scale, 1, scale);
@@ -835,8 +843,14 @@ export async function createBoard(container, opts = {}) {
 
     // Mar em volta da ilha tropical
     if (TH.water) {
-      const water = new THREE.Mesh(new THREE.CircleGeometry(radius * 2.4, 64),
-        new THREE.MeshStandardMaterial({ color: TH.water, roughness: 0.15, metalness: 0.1, transparent: true, opacity: 0.85 }));
+      // mar em volta que some aos poucos, pra emendar com o vídeo de fundo
+      const ac = document.createElement('canvas'); ac.width = ac.height = 256;
+      const ag = ac.getContext('2d');
+      const grd = ag.createRadialGradient(128, 128, 40, 128, 128, 128);
+      grd.addColorStop(0, '#fff'); grd.addColorStop(0.55, '#fff'); grd.addColorStop(1, '#000');
+      ag.fillStyle = grd; ag.fillRect(0, 0, 256, 256);
+      const water = new THREE.Mesh(new THREE.CircleGeometry(radius * 1.35, 64),
+        new THREE.MeshStandardMaterial({ color: TH.water, roughness: 0.15, metalness: 0.1, transparent: true, opacity: 0.85, alphaMap: new THREE.CanvasTexture(ac), depthWrite: false }));
       water.rotation.x = -Math.PI / 2;
       water.position.set(center.x, -1.6, center.z);
       water.userData.water = true;
