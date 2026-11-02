@@ -1,14 +1,14 @@
 # Rive no Mimicaço (experimento)
 
 - `public/rive-lab.html`: página de teste no celular (abre em `/rive-lab.html`).
-- `public/rive/rawzinho.riv`: Rawzinho 2D com a máquina de estados `Reacoes`
+- `public/rive/rawzinho.riv` e `toninho.riv`: personagens 2D com a máquina de estados `Reacoes`
   e os gatilhos `acertou`, `errou`, `carta` e `cocegas`.
 - `public/vendor/rive/`: runtime `@rive-app/canvas-lite` 2.49.0 (MIT), servido localmente.
 
 O `.riv` é gerado por código, sem o editor do Rive:
 
 ```
-python3 tools/rive/rawzinho.py tools/rive/src
+python3 tools/rive/personagem.py todos
 ```
 
 `riv.py` escreve o formato binário do runtime (chaves tiradas de

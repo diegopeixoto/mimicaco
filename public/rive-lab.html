@@ -20,7 +20,8 @@
 </head>
 <body>
 <main>
-  <h2>Rawzinho em Rive</h2>
+  <h2>Turma do Rawzinho em Rive</h2>
+  <div class="btns" style="margin-bottom:8px"><button data-p="rawzinho">Rawzinho</button><button data-p="toninho" class="ghost">Toninho</button></div>
   <div class="stage"><canvas id="rive" width="500" height="640"></canvas></div>
   <div class="btns">
     <button data-t="acertou" style="background:var(--good);color:#fff">Acertou!</button>
@@ -28,35 +29,44 @@
     <button data-t="carta">Puxar carta</button>
     <button data-t="cocegas" class="ghost">Cócegas</button>
   </div>
-  <p class="info">Toque no Rawzinho também. <span id="stats">Carregando…</span></p>
+  <p class="info">Toque no personagem também. <span id="stats">Carregando…</span></p>
 </main>
 <script src="vendor/rive/rive.js"></script>
 <script>
-  const t0 = performance.now();
   rive.RuntimeLoader.setWasmUrl('vendor/rive/rive.wasm');
+  rive.Rive.suppressDeprecationWarnings = ['state-machines-param', 'state-machine-inputs'];
   const canvas = document.getElementById('rive');
   const SM = 'Reacoes';
-  let inputs = {};
-  const r = new rive.Rive({
-    src: 'rive/rawzinho.riv',
-    canvas,
-    autoplay: true,
-    stateMachines: SM,
-    layout: new rive.Layout({ fit: rive.Fit.Contain, alignment: rive.Alignment.BottomCenter }),
-    onLoad: () => {
-      r.resizeDrawingSurfaceToCanvas();
-      for (const i of r.stateMachineInputs(SM)) inputs[i.name] = i;
-      document.getElementById('stats').innerHTML = `Pronto em <b>${Math.round(performance.now() - t0)} ms</b>. <span id="fps"></span>`;
-      window.riveReady = true;
-    },
-    onLoadError: (e) => { document.getElementById('stats').textContent = 'Erro ao carregar: ' + e; window.riveError = String(e); },
-  });
-  window.riveInst = r;
+  let inputs = {}, r = null;
+  function load(nome) {
+    r?.cleanup();
+    inputs = {}; window.riveReady = false;
+    const t1 = performance.now();
+    document.querySelectorAll('[data-p]').forEach((b) => b.classList.toggle('ghost', b.dataset.p !== nome));
+    r = new rive.Rive({
+      src: `rive/${nome}.riv`,
+      canvas,
+      autoplay: true,
+      stateMachines: SM,
+      layout: new rive.Layout({ fit: rive.Fit.Contain, alignment: rive.Alignment.BottomCenter }),
+      onLoad: () => {
+        r.resizeDrawingSurfaceToCanvas();
+        for (const i of r.stateMachineInputs(SM)) inputs[i.name] = i;
+        document.getElementById('stats').innerHTML = `Pronto em <b>${Math.round(performance.now() - t1)} ms</b>. <span id="fps"></span>`;
+        window.riveReady = true;
+      },
+      onLoadError: (e) => { document.getElementById('stats').textContent = 'Erro ao carregar: ' + e; window.riveError = String(e); },
+    });
+    window.riveInst = r;
+  }
+  window.load = load;
+  document.querySelectorAll('[data-p]').forEach((b) => b.onclick = () => load(b.dataset.p));
+  load(new URLSearchParams(location.search).get('p') || 'rawzinho');
   const fire = (name) => { inputs[name]?.fire(); navigator.vibrate?.(30); };
   window.fire = fire;
   document.querySelectorAll('[data-t]').forEach((b) => b.onclick = () => fire(b.dataset.t));
   canvas.addEventListener('pointerdown', () => fire('cocegas'));
-  addEventListener('resize', () => r.resizeDrawingSurfaceToCanvas());
+  addEventListener('resize', () => r?.resizeDrawingSurfaceToCanvas());
   // medidor simples de quadros por segundo
   let frames = 0, last = performance.now();
   (function loop(now) {
