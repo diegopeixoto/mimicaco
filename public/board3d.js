@@ -116,15 +116,15 @@ export async function createBoard(container, opts = {}) {
     for (let i = 0; i < 40; i++) {
       const x = rnd() * 256, y = rnd() * 256, r = 18 + rnd() * 40;
       const grd = g.createRadialGradient(x, y, 0, x, y, r);
-      grd.addColorStop(0, shade(rnd() < 0.5 ? 0.05 : -0.05)); grd.addColorStop(1, 'rgba(0,0,0,0)');
+      grd.addColorStop(0, shade(rnd() < 0.5 ? 0.03 : -0.03)); grd.addColorStop(1, 'rgba(0,0,0,0)');
       g.fillStyle = grd;
       for (const dx of [-256, 0, 256]) for (const dy of [-256, 0, 256]) { g.save(); g.translate(dx, dy); g.fillRect(x - r, y - r, r * 2, r * 2); g.restore(); }
     }
     if (kind === 'grass') {
       g.lineCap = 'round';
-      for (let i = 0; i < 900; i++) {
-        const x = rnd() * 256, y = rnd() * 256, l = 3 + rnd() * 6, a = -Math.PI / 2 + (rnd() - 0.5) * 0.9;
-        g.strokeStyle = shade(rnd() < 0.5 ? 0.04 + rnd() * 0.04 : -0.06 - rnd() * 0.05);
+      for (let i = 0; i < 520; i++) {
+        const x = rnd() * 256, y = rnd() * 256, l = 3 + rnd() * 5, a = -Math.PI / 2 + (rnd() - 0.5) * 0.9;
+        g.strokeStyle = shade(rnd() < 0.4 ? 0.03 + rnd() * 0.03 : -0.04 - rnd() * 0.04);
         g.lineWidth = 1 + rnd() * 1.4;
         g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); g.stroke();
       }
@@ -173,18 +173,20 @@ export async function createBoard(container, opts = {}) {
       g.font = '110px "Lilita One", sans-serif';
       g.textAlign = 'center'; g.textBaseline = 'middle';
       g.lineWidth = 12; g.strokeStyle = 'rgba(18,58,122,.8)';
-      g.strokeText(label, 128, 120); g.fillText(label, 128, 120);
+      g.strokeText(label, 128, 92); g.fillText(label, 128, 92);
       g.font = '34px "Lilita One", sans-serif';
-      g.lineWidth = 7; g.strokeText('PULO!', 128, 200); g.fillText('PULO!', 128, 200);
+      g.lineWidth = 7; g.strokeText('PULO!', 128, 140); g.fillText('PULO!', 128, 140);
     }
     g.restore();
-    if (num) {
+    if (num) { // número grande, legível de longe
+      g.fillStyle = '#ffffff';
+      g.beginPath(); g.arc(128, 196, 50, 0, Math.PI * 2); g.fill();
       g.fillStyle = '#123a7a';
-      g.beginPath(); g.arc(128, 222, 26, 0, Math.PI * 2); g.fill();
+      g.beginPath(); g.arc(128, 196, 43, 0, Math.PI * 2); g.fill();
       g.fillStyle = '#fff';
-      g.font = '34px "Lilita One", sans-serif';
+      g.font = `${num >= 10 ? 54 : 64}px "Lilita One", sans-serif`;
       g.textAlign = 'center'; g.textBaseline = 'middle';
-      g.fillText(String(num), 128, 224);
+      g.fillText(String(num), 128, 200);
     }
     const t = new THREE.CanvasTexture(c);
     t.colorSpace = THREE.SRGBColorSpace;
@@ -858,6 +860,7 @@ export async function createBoard(container, opts = {}) {
     }
 
     // Casas
+    const edgeMat = new THREE.MeshStandardMaterial({ color: 0x2a2550, roughness: 0.7 });
     board.forEach((sq, i) => {
       let color = '#ffffff', img = null, label = null;
       if (sq.type === 'cat') { color = categories[sq.cat].color; img = images[ART[sq.cat]]; }
@@ -873,7 +876,11 @@ export async function createBoard(container, opts = {}) {
       base.castShadow = true;
       base.receiveShadow = true;
       g.add(base);
-      const top = new THREE.Mesh(new THREE.CircleGeometry(0.43 * s, 48),
+      // contorno escuro em volta da casa, pra destacar da grama
+      const edge = new THREE.Mesh(new RoundedBoxGeometry(TILE * s + 0.12, 0.2, TILE * s + 0.12, 3, 0.16), edgeMat);
+      edge.position.y = -0.1;
+      g.add(edge);
+      const top = new THREE.Mesh(new THREE.CircleGeometry(0.45 * s, 48),
         new THREE.MeshStandardMaterial({ map: tileTexture({ img, color, num: sq.type === 'cat' || sq.type === 'all' || sq.type === 'jump' ? i : null, label }), roughness: 0.6 }));
       top.rotation.x = -Math.PI / 2;
       top.position.y = 0.175;
@@ -952,7 +959,7 @@ export async function createBoard(container, opts = {}) {
     sun.position.copy(center).add(new THREE.Vector3(-8, 16, 10));
 
     // Anel que marca quem está jogando
-    ring = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.06, 10, 40), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+    ring = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.085, 12, 48), new THREE.MeshBasicMaterial({ color: 0xffffff }));
     ring.rotation.x = -Math.PI / 2;
     ring.visible = false;
     boardGroup.add(ring);
