@@ -1,0 +1,14 @@
+/* Páginas de Termos de uso e Política de privacidade. */
+.legal { max-width: 760px; margin: 0 auto; padding: 24px 16px 8px; }
+.legal .topo { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.legal .topo img { width: min(200px, 45vw); filter: drop-shadow(0 4px 0 rgba(0,0,0,.2)); }
+.legal .topo a { color: #fff; font-weight: 700; text-shadow: 0 1px 3px rgba(0,0,0,.7); }
+.legal article { background: rgba(255,255,255,.96); color: #1d2a44; border-radius: 18px; padding: 22px 22px 28px;
+  box-shadow: 0 8px 0 rgba(10,30,70,.35); line-height: 1.55; font-size: 1.02rem; }
+.legal article h1 { color: #123a7a; font-size: 2rem; }
+.legal article h2 { color: #123a7a; font-size: 1.3rem; margin-top: 1.4em; }
+.legal article a { color: #1d4fa3; font-weight: 700; }
+.legal article ul { padding-left: 1.2em; }
+.legal article li { margin: .3em 0; }
+.legal .data { color: #5a6782; margin-top: -.2em; }
+@media (max-width: 480px) { .legal article { padding: 18px 16px 22px; } }
