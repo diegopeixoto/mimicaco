@@ -55,6 +55,12 @@
   .toast h1 { font-size: 3.4rem; color: #fff; -webkit-text-stroke: 3px #123a7a; paint-order: stroke fill; text-shadow: 0 6px 0 #123a7a; margin: .2em 0 0; }
   .toast p { font-size: 1.3rem; font-weight: 800; color: #fff; text-shadow: 0 2px 6px rgba(0,0,0,.6); margin: .2em 0; }
 
+  .toast.sub { top: auto; bottom: 6vh; transform: translate(-50%, 0) scale(.6); z-index: 46; }
+  .toast.sub.show { transform: translate(-50%, 0) scale(1); }
+  .toast.sub p { font-size: 1.6rem; background: rgba(18,58,122,.85); padding: .3em 1em; border-radius: 999px; text-shadow: none; }
+  /* Rawzinho/Toninho em Rive por cima do tabuleiro (fora do painel lateral) */
+  @media (min-width: 901px) { #riveFx { right: 400px !important; } }
+  #riveFx canvas { width: min(100%, 78vh) !important; height: 92vh !important; }
   .overlay { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(18,58,122,.55); z-index: 50; padding: 16px; }
   .overlay .panel { max-width: 520px; width: 100%; text-align: center; }
   .confetti { position: fixed; top: -20px; width: 12px; height: 18px; z-index: 60; animation: fall linear forwards; }
@@ -74,6 +80,7 @@
 <div id="overlay"></div>
 
 <script src="net.js"></script>
+<script src="rive-fx.js"></script>
 <script type="module">
 import { createBoard } from './board3d.js';
 
@@ -212,31 +219,43 @@ function bindSide() {
 
 // ---------- Avisos grandes ----------
 let toastTimer;
-function toast(html, ms = 2200) {
+function toast(html, ms = 2200, sub = false) {
   const el = document.getElementById('toast');
   el.innerHTML = html;
+  el.classList.toggle('sub', sub);
   el.classList.add('show');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => el.classList.remove('show'), ms);
 }
 
+// equipes alternam o mascote: 1ª Rawzinho, 2ª Toninho, 3ª Rawzinho...
+const mascote = (t) => (t && S.teams.indexOf(t) % 2 === 1 ? 'toninho' : 'rawzinho');
+let lastActingId = null;
+
 function onEvents() {
+  if (S.phase !== 'lobby') { window.RiveFx.preload('rawzinho').catch(() => {}); window.RiveFx.preload('toninho').catch(() => {}); }
+  // na primeira atualização só anota o resultado que já existia (reconexão), sem mostrar aviso
+  if (lastResultId === null) lastResultId = S.result ? S.result.id : 0;
   if (S.result && S.result.id !== lastResultId) {
-    const first = lastResultId === null;
     lastResultId = S.result.id;
-    if (!first) {
+    {
       const r = S.result, t = r.teamId && teamById(r.teamId);
+      // personagem da equipe (Rawzinho ou Toninho) reage em Rive; se o Rive falhar, volta o aviso antigo
+      const who = mascote(t || teamById(lastActingId));
       if (r.kind === 'miss') {
         Som.play('errou'); Som.voz('errou', 300);
-        toast(`<img src="img/tempo.jpg"><h1>Não foi dessa vez!</h1>${r.word ? `<p>A palavra era “${esc(r.word)}”</p>` : '<p>Repescagem! A próxima equipe tenta.</p>'}`);
+        const sub = r.word ? `A palavra era “${esc(r.word)}”` : 'Repescagem! A próxima equipe tenta.';
+        window.RiveFx.play('errou', who).then((ok) => ok ? toast(`<p>${sub}</p>`, 2000, true)
+          : toast(`<img src="img/tempo.jpg"><h1>Não foi dessa vez!</h1><p>${sub}</p>`));
       } else {
         Som.play('acertou'); Som.voz('acertou', 300);
         const title = r.kind === 'steal_hit' ? 'Roubou a carta!' : 'Acertou!';
-        toast(`<img src="img/acertou.jpg"><h1>${title}</h1><p>${esc(t.name)} · “${esc(r.word)}”</p>`);
-        confetti(40);
+        window.RiveFx.play('acertou', who).then((ok) => ok ? toast(`<p>${r.kind === 'steal_hit' ? 'Roubou! ' : ''}${esc(t.name)} · “${esc(r.word)}”</p>`, 2000, true)
+          : (toast(`<img src="img/acertou.jpg"><h1>${title}</h1><p>${esc(t.name)} · “${esc(r.word)}”</p>`), confetti(40)));
       }
     }
   }
+  if (['card', 'miming', 'timeup'].includes(S.phase)) lastActingId = S.turn?.actingId;
   if (S.phase === lastPhase) return;
   if (S.phase === 'turn' && lastPhase && lastPhase !== 'lobby') Som.voz('suavez', 2600);
   if (S.phase === 'turn' && lastPhase === 'lobby') Som.voz('suavez', 300);

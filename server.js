@@ -423,6 +423,7 @@ function broadcast(room) {
 const MIME = {
   '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.svg': 'image/svg+xml',
   '.png': 'image/png', '.jpg': 'image/jpeg', '.mp3': 'audio/mpeg', '.ttf': 'font/ttf', '.txt': 'text/plain; charset=utf-8',
+  '.wasm': 'application/wasm', '.riv': 'application/octet-stream',
 };
 
 const server = http.createServer(async (req, res) => {
