@@ -54,12 +54,14 @@ function beep(freq = 880, ms = 150) {
 // Música, falas do Rawzinho e efeitos podem ser ligados/desligados separadamente.
 const Som = (() => {
   const cache = {};
+  const urls = {}; // nome -> blob: já baixado (tela de carregando), toca na hora
+  const src = (name) => urls[name] || `som/${name}.mp3`;
   let opt = { musica: true, vozes: true, efeitos: true };
   try { opt = { ...opt, ...(JSON.parse(localStorage.getItem('mimica_som2')) || {}) }; } catch {}
   let music = null, unlocked = false, voiceBusy = null, wantMusic = false, track = 'musica';
   const save = () => { try { localStorage.setItem('mimica_som2', JSON.stringify(opt)); } catch {} };
   function get(name) {
-    if (!cache[name]) { cache[name] = new Audio(`som/${name}.mp3`); cache[name].preload = 'auto'; }
+    if (!cache[name]) { cache[name] = new Audio(src(name)); cache[name].preload = 'auto'; }
     return cache[name];
   }
   function raw(name, vol) {
@@ -82,7 +84,7 @@ const Som = (() => {
   function startMusic() {
     wantMusic = true;
     if (!opt.musica || music || !unlocked) return;
-    music = new Audio(`som/${track}.mp3`);
+    music = new Audio(src(track));
     music.loop = true; music.volume = 0.35;
     music.play().catch(() => { music = null; });
   }
@@ -129,5 +131,12 @@ const Som = (() => {
     wrap.append(menu, b);
     document.body.appendChild(wrap);
   }
-  return { play, voz, startMusic, stopMusic, unlock, button, setTrack };
+  // baixa os sons antes de precisar (baixar = Carregando.baixar ou load.baixar, que conta na barra)
+  function preload(names, baixar) {
+    return Promise.allSettled(names.map((name) => baixar(`som/${name}.mp3`).then((b) => {
+      urls[name] = URL.createObjectURL(b.type.startsWith('audio') ? b : new Blob([b], { type: 'audio/mpeg' }));
+      delete cache[name];
+    })));
+  }
+  return { play, voz, startMusic, stopMusic, unlock, button, setTrack, preload };
 })();

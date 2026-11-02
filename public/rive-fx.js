@@ -7,6 +7,7 @@
   const SM = 'Reacoes';
   let runtime = null, hideTimer = null, active = null, off = false;
   const chars = {}; // nome -> Promise<{ r, inputs, canvas }>
+  const bufs = {}; // nome -> ArrayBuffer do .riv já baixado (pela tela de carregando)
   try { off = new URLSearchParams(location.search).get('rive') === '0'; } catch {}
 
   const css = `
@@ -51,7 +52,7 @@
       canvas.width = 500; canvas.height = 640;
       el().appendChild(canvas);
       const r = new rive.Rive({
-        src: `rive/${who}.riv`, canvas, autoplay: false, stateMachines: SM,
+        ...(bufs[who] ? { buffer: bufs[who].slice(0) } : { src: `rive/${who}.riv` }), canvas, autoplay: false, stateMachines: SM,
         layout: new rive.Layout({ fit: rive.Fit.Contain, alignment: rive.Alignment.BottomCenter }),
         onLoad: () => {
           const inputs = {};
@@ -89,5 +90,5 @@
     }
   }
 
-  window.RiveFx = { preload, play };
+  window.RiveFx = { preload, play, runtime: loadRuntime, guardar: (who, buf) => { bufs[who] = buf; }, desligado: off };
 })();

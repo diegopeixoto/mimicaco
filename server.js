@@ -512,7 +512,7 @@ const server = http.createServer(async (req, res) => {
     }
     const ext = path.extname(full);
     const cache = ['.jpg', '.png', '.mp3', '.ttf', '.glb', '.mp4'].includes(ext) || full.includes('/vendor/') ? 'public, max-age=86400' : 'no-cache';
-    res.writeHead(200, { 'content-type': MIME[ext] || 'application/octet-stream', 'cache-control': cache });
+    res.writeHead(200, { 'content-type': MIME[ext] || 'application/octet-stream', 'cache-control': cache, 'content-length': data.length });
     res.end(data);
   });
 });

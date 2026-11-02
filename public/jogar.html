@@ -72,6 +72,7 @@
 <script src="rodape.js"></script>
 <script src="net.js"></script>
 <script src="rive-fx.js"></script>
+<script src="carregando.js"></script>
 <script type="module">
 import { createBoard } from './board3d.js';
 
@@ -93,6 +94,8 @@ if (!code) location.href = '/';
 if (!names.length) askName(); else start();
 Som.unlock(false);
 Som.button(false);
+// no celular não tem música nem falas: os efeitos baixam em segundo plano enquanto a pessoa entra
+Som.preload(['pop', 'carta', 'acertou', 'errou', 'tempo', 'vitoria', 'tique'], Carregando.baixar);
 
 function askName() {
   app.innerHTML = `<div class="stack" style="padding-top:6vh">
@@ -176,7 +179,7 @@ function render() {
 
   if (S.phase !== lastPhase) {
     if (S.phase === 'miming') revealWord = false;
-    if (S.phase !== 'lobby') { RiveFx.preload('rawzinho').catch(() => {}); RiveFx.preload('toninho').catch(() => {}); }
+    RiveFx.preload('rawzinho').catch(() => {}); RiveFx.preload('toninho').catch(() => {}); // já no lobby, para a 1ª reação sair na hora
     if (S.phase === 'timeup') { Som.play('tempo', .6); navigator.vibrate?.(400); }
     if (S.phase === 'over') Som.play('vitoria', .7);
   }
