@@ -197,7 +197,7 @@ class Riv:
         for i, t in enumerate(names):
             self.add('AnimationState', animationId=oneshots[t])
             # volta para o idle quando a animação termina (exit time 100%)
-            self.add('StateTransition', stateToId=3, flags=4 | 8, exitTime=100, transDuration=150)
+            self.add('StateTransition', stateToId=3, flags=4 | 8, exitTime=100, transDuration=0)
 
     def bytes(self):
         self.flush()

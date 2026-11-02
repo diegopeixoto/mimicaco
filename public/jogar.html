@@ -66,6 +66,7 @@
 </main>
 <div class="toast" id="toast"></div>
 <script src="net.js"></script>
+<script src="rive-fx.js"></script>
 <script type="module">
 import { createBoard } from './board3d.js';
 
@@ -144,21 +145,27 @@ function render() {
   if (board && board !== 'loading') board.update(S, net.offset);
 
   // avisos de resultado
+  // na primeira atualização só anota o resultado que já existia (reconexão), sem mostrar aviso
+  if (lastResultId === null) lastResultId = S.result ? S.result.id : 0;
   if (S.result && S.result.id !== lastResultId) {
-    const first = lastResultId === null;
     lastResultId = S.result.id;
-    if (!first) {
-      if (S.result.kind === 'miss') { Som.play('errou', .6); toast(`<img src="img/tempo.jpg"><h1>Não foi!</h1>`); }
-      else { Som.play('acertou', .7); navigator.vibrate?.([60, 40, 60]); toast(`<img src="img/acertou.jpg"><h1>${S.result.kind === 'steal_hit' ? 'Roubou!' : 'Acertou!'}</h1>`); }
+    {
+      // Rawzinho/Toninho reagem em Rive; se o Rive falhar, volta o aviso antigo
+      const who = mascote(S.result.teamId || lastActingId);
+      if (S.result.kind === 'miss') { Som.play('errou', .6); RiveFx.play('errou', who).then((ok) => ok || toast(`<img src="img/tempo.jpg"><h1>Não foi!</h1>`)); }
+      else { Som.play('acertou', .7); navigator.vibrate?.([60, 40, 60]); RiveFx.play('acertou', who).then((ok) => ok || toast(`<img src="img/acertou.jpg"><h1>${S.result.kind === 'steal_hit' ? 'Roubou!' : 'Acertou!'}</h1>`)); }
     }
   }
 
+  // lembra quem estava jogando (depois do aviso: no erro o estado já chega com a vez da repescagem)
+  if (S.turn && ['card', 'miming', 'timeup'].includes(S.phase)) lastActingId = S.turn.actingId;
   let body = '';
   if (S.phase === 'lobby' || (!myTeam && !me.judge)) body = lobbyHtml(me, myTeam);
   else body = gameHtml(me, myTeam);
 
   if (S.phase !== lastPhase) {
     if (S.phase === 'miming') revealWord = false;
+    if (S.phase !== 'lobby') { RiveFx.preload('rawzinho').catch(() => {}); RiveFx.preload('toninho').catch(() => {}); }
     if (S.phase === 'timeup') { Som.play('tempo', .6); navigator.vibrate?.(400); }
     if (S.phase === 'over') Som.play('vitoria', .7);
   }
@@ -170,6 +177,22 @@ function render() {
     lastMoveId = S.move.id;
     setTimeout(() => S && render(), Math.max(0, S.move.at + S.move.dur - now()) + 60);
   }
+}
+
+// equipes alternam o mascote: 1ª Rawzinho, 2ª Toninho, 3ª Rawzinho...
+function mascote(teamId = S.you.teamId) {
+  const t = teamById(teamId);
+  return t && S.teams.indexOf(t) % 2 === 1 ? 'toninho' : 'rawzinho';
+}
+let lastActingId = null;
+
+// "Sua vez!": o mascote mostra a carta quando chega a vez de quem vai fazer a mímica
+let suaVezFor = null;
+function suaVez(iAmMimer) {
+  const key = S.turn && `${S.turn.teamId}:${S.turn.mimer?.pid}:${S.board?.[teamById(S.turn.teamId)?.pos]?.type}:${S.move?.id}`;
+  if (!iAmMimer || S.phase !== 'draw' || moving() || key === suaVezFor) return;
+  suaVezFor = key;
+  RiveFx.play('carta', mascote());
 }
 
 function lobbyHtml(me, myTeam) {
@@ -217,6 +240,7 @@ function gameHtml(me, myTeam) {
     if (anim) return `<h2>🎲 Tirou ${S.move.value ?? ''}!</h2><p class="hint">Olha o peão andando…</p>`;
     const sq = S.board[team.pos];
     const where = sq.type === 'all' ? '<h2>⚡ Todos jogam!</h2>' : sq.cat ? `<div class="pill" style="background:${S.categories[sq.cat].color}">${S.categories[sq.cat].emoji} ${esc(S.categories[sq.cat].name)}</div>` : '';
+    if (iAmMimer) suaVez(true);
     if (iAmMimer) return `${S.message ? `<div class="banner">${esc(S.message)}</div>` : ''}<img class="art pop" src="img/hero.jpg" alt="">
       <h1>${esc(mimer.name)}, sua vez de fazer mímica!</h1>${where}
       <p class="hint">Só você vai ver a palavra. Esconda a tela!</p>
