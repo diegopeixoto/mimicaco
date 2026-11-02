@@ -27,6 +27,10 @@
   .chip button { padding: 0 .45em; box-shadow: none; background: #ffd6d6; color: #c0262c; font-size: .9rem; border-radius: 50%; }
   .addrow { display: flex; gap: 8px; }
   .addrow input { flex: 1; }
+  .addrow input.agein, .chip input.agein { flex: none; width: 5.4em; text-align: center; padding-left: .3em; padding-right: .3em; }
+  .chip input.agein { width: 3.2em; padding: .15em .2em; font-size: .9rem; border-radius: 10px; background: #eef4ff; color: #123a7a; }
+  body.lvl-familia { background-image: url(img/fundo_ilha.jpg); background-position: center; }
+  body.lvl-adulto { background-image: url(img/fundo_vulcao.jpg); background-position: 70% center; }
   .art { width: 40vw; max-width: 180px; aspect-ratio: 1; border-radius: 50%; object-fit: cover; border: 5px solid #fff; box-shadow: 0 8px 0 rgba(10,30,70,.35); margin: 6px auto 12px; display: block; }
   .word { font-family: 'Lilita One', sans-serif; font-size: clamp(2rem, 11vw, 3.2rem); line-height: 1.05; margin: .3em 0; color: var(--accent); word-break: break-word; }
   .twist { display: inline-block; background: var(--bad); color: #fff; font-weight: 800; padding: .25em .9em; border-radius: 999px; }
@@ -76,11 +80,14 @@ const code = (params.get('sala') || '').toUpperCase();
 const saved = store('mimica_player') || {};
 const pid = saved.pid || (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2));
 let names = saved.names || (saved.name ? [saved.name] : []);
-store('mimica_player', { ...saved, pid, names });
+let ages = saved.ages || [];
+store('mimica_player', { ...saved, pid, names, ages });
 let S = null, net = null, lastPhase = null, lastResultId = null, lastMoveId = null, revealWord = false, board = null, boardHidden = false, flipShownFor = null;
 const app = document.getElementById('app');
 const img = (k) => `img/${k}.jpg`;
-const saveNames = () => store('mimica_player', { ...store('mimica_player'), names });
+const saveNames = () => store('mimica_player', { ...store('mimica_player'), names, ages });
+const sendNames = () => { saveNames(); send({ t: 'names', names, ages: names.map((_, i) => ages[i] || null) }); };
+const ageVal = (v) => { const n = Math.round(Number(v)); return n >= 2 && n <= 99 ? n : null; };
 
 if (!code) location.href = '/';
 if (!names.length) askName(); else start();
@@ -92,22 +99,23 @@ function askName() {
     <img src="img/logo.png" alt="Turma do Rawzinho" style="width:min(300px,80vw)">
     <img class="art" src="img/hero.jpg" alt="">
     <h2>Sala ${esc(code)}</h2>
-    <input id="nm" maxlength="20" placeholder="Seu nome" autofocus>
+    <div class="addrow"><input id="nm" maxlength="20" placeholder="Seu nome" autofocus><input id="ag" class="agein" type="number" inputmode="numeric" min="2" max="99" placeholder="Idade"></div>
     <button class="big" id="ok">Entrar</button>
+    <p class="hint">A idade ajuda a escolher o nível das cartas.</p>
     <p class="hint">Vão jogar várias pessoas neste celular? Depois de entrar dá para adicionar mais nomes.</p>
     ${canalYT('Conheça a turma no YouTube')}
     <p class="hint">Use só nome ou apelido. Ao entrar, você concorda com os <a href="termos.html" style="color:inherit">Termos de uso</a> e a <a href="privacidade.html" style="color:inherit">Política de privacidade</a>.</p></div>`;
   const go = () => {
     const v = document.getElementById('nm').value.trim();
     if (!v) return;
-    names = [v]; saveNames(); start();
+    names = [v]; ages = [ageVal(document.getElementById('ag').value)]; saveNames(); start();
   };
   document.getElementById('ok').onclick = go;
   document.getElementById('nm').onkeydown = (e) => e.key === 'Enter' && go();
 }
 
 function start() {
-  net = connect(() => ({ code, pid, names }), (st) => { S = st; render(); }, (err) => {
+  net = connect(() => ({ code, pid, names, ages: names.map((_, i) => ages[i] || null) }), (st) => { S = st; render(); }, (err) => {
     app.innerHTML = `<div class="stack" style="padding-top:20vh"><h2>Ops!</h2><p>${esc(err)}</p><button onclick="location.href='/'">Voltar</button></div>`;
   });
 }
@@ -125,7 +133,7 @@ function ensureBoard() {
   document.getElementById('boardBtn').textContent = boardHidden ? 'Ver tabuleiro' : 'Esconder';
   if (S.phase === 'lobby' || board) return;
   board = 'loading';
-  createBoard(document.getElementById('board'), { low: true, zoom: 0.9, onHop: () => Som.play('pulo', .3) })
+  createBoard(document.getElementById('board'), { low: true, zoom: 0.9, onHop: () => Som.play(S.settings.level === 'adulto' ? 'pisada' : 'pulo', .3) })
     .then((b) => { board = b; b.update(S, net.offset); });
 }
 document.getElementById('boardBtn').onclick = () => { boardHidden = !boardHidden; ensureBoard(); };
@@ -173,7 +181,10 @@ function render() {
     if (S.phase === 'over') Som.play('vitoria', .7);
   }
   lastPhase = S.phase;
-  if (document.activeElement?.id === 'newName' && S.phase === 'lobby') return; // não apaga o que está sendo digitado
+  document.body.classList.remove('lvl-kids', 'lvl-familia', 'lvl-adulto');
+  document.body.classList.add('lvl-' + (S.settings.level || 'kids'));
+  const ae = document.activeElement;
+  if ((ae?.id === 'newName' || ae?.id === 'newAge' || ae?.dataset?.age !== undefined) && S.phase === 'lobby') return; // não apaga o que está sendo digitado
   app.innerHTML = body;
   bind();
   if (S.move && S.move.id !== lastMoveId) {
@@ -200,8 +211,9 @@ function suaVez(iAmMimer) {
 
 function lobbyHtml(me, myTeam) {
   return `<h2>Quem joga neste celular?</h2>
-    <div class="chips">${me.names.map((n, i) => `<span class="chip">${esc(n)}${me.names.length > 1 ? `<button data-rm="${i}" aria-label="Tirar">✕</button>` : ''}</span>`).join('')}</div>
-    <div class="addrow" style="margin-top:10px"><input id="newName" maxlength="20" placeholder="Adicionar outra pessoa"><button id="addName">+</button></div>
+    <div class="chips">${me.names.map((n, i) => `<span class="chip">${esc(n)}<input class="agein" type="number" inputmode="numeric" min="2" max="99" placeholder="idade" data-age="${i}" value="${ages[i] || ''}">${me.names.length > 1 ? `<button data-rm="${i}" aria-label="Tirar">✕</button>` : ''}</span>`).join('')}</div>
+    <div class="addrow" style="margin-top:10px"><input id="newName" maxlength="20" placeholder="Adicionar outra pessoa"><input id="newAge" class="agein" type="number" inputmode="numeric" min="2" max="99" placeholder="Idade"><button id="addName">+</button></div>
+    ${S.avgAge != null ? `<p class="hint">Média de idade da sala: <b>${S.avgAge} anos</b> · nível ${S.levels[S.settings.level].emoji} ${S.levels[S.settings.level].name}</p>` : ''}
     <h2 style="margin-top:1.2em">Escolha a equipe</h2>
     <div class="btns">${S.teams.map((t) => `<button class="teambtn ${t.id === me.teamId ? 'mine' : ''}" style="background:${t.color}" data-team="${t.id}">
       <span>${esc(t.name)}</span><small>${t.people.length} ${t.people.length === 1 ? 'pessoa' : 'pessoas'}</small></button>`).join('')}
@@ -243,7 +255,8 @@ function gameHtml(me, myTeam) {
   if (S.phase === 'draw') {
     if (anim) return `<h2>🎲 Tirou ${S.move.value ?? ''}!</h2><p class="hint">Olha o peão andando…</p>`;
     const sq = S.board[team.pos];
-    const where = sq.type === 'all' ? '<h2>⚡ Todos jogam!</h2>' : sq.cat ? `<div class="pill" style="background:${S.categories[sq.cat].color}">${S.categories[sq.cat].emoji} ${esc(S.categories[sq.cat].name)}</div>` : '';
+    const face = S.turn.catFace && S.turn.catFace !== 'casa' && sq.type !== 'finish' ? S.turn.catFace : sq.cat;
+    const where = sq.type === 'all' ? '<h2>⚡ Todos jogam!</h2>' : face ? `<div class="pill" style="background:${S.categories[face].color}">${S.categories[face].emoji} ${esc(S.categories[face].name)}</div>` : '';
     if (iAmMimer) suaVez(true);
     if (iAmMimer) return `${S.message ? `<div class="banner">${esc(S.message)}</div>` : ''}<img class="art pop" src="img/hero.jpg" alt="">
       <h1>${esc(mimer.name)}, sua vez de fazer mímica!</h1>${where}
@@ -285,11 +298,12 @@ function bind() {
   app.querySelectorAll('[data-judge]').forEach((b) => (b.onclick = () => { Som.play('pop'); send({ t: 'be_judge', on: b.dataset.judge === '1' }); }));
   app.querySelectorAll('[data-act]').forEach((b) => (b.onclick = () => send({ t: b.dataset.act })));
   app.querySelectorAll('[data-result]').forEach((b) => (b.onclick = () => send({ t: 'result', teamId: b.dataset.result || null })));
-  app.querySelectorAll('[data-rm]').forEach((b) => (b.onclick = () => { names.splice(+b.dataset.rm, 1); saveNames(); send({ t: 'names', names }); }));
+  app.querySelectorAll('[data-rm]').forEach((b) => (b.onclick = () => { names.splice(+b.dataset.rm, 1); ages.splice(+b.dataset.rm, 1); sendNames(); }));
+  app.querySelectorAll('[data-age]').forEach((el) => (el.onchange = () => { ages[+el.dataset.age] = ageVal(el.value); sendNames(); }));
   const add = document.getElementById('addName');
   if (add) {
     const inp = document.getElementById('newName');
-    const go = () => { const v = inp.value.trim(); if (!v) return; names.push(v); saveNames(); Som.play('pop'); send({ t: 'names', names }); };
+    const go = () => { const v = inp.value.trim(); if (!v) return; ages[names.length] = ageVal(document.getElementById('newAge').value); names.push(v); Som.play('pop'); sendNames(); };
     add.onclick = go;
     inp.onkeydown = (e) => e.key === 'Enter' && go();
   }

@@ -7,6 +7,19 @@
 <link rel="stylesheet" href="style.css">
 <style>
   html, body { height: 100%; overflow: hidden; }
+  body { transition: background-image .6s; }
+  body.lvl-familia { background-image: url(img/fundo_ilha.jpg); }
+  body.lvl-adulto { background-image: url(img/fundo_vulcao.jpg); }
+  #bgvid { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: -1; opacity: 0; transition: opacity .8s; }
+  #bgvid.on { opacity: 1; }
+  .levels { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .hostbtn { flex: 1; white-space: nowrap; background: #fff; color: #2a2550; border: 3px solid #2a2550; font-size: 1rem; padding: .55em .8em; box-shadow: 0 4px 0 rgba(0,0,0,.35); text-shadow: none; }
+  .hostbtn.stop { background: #ffe1dc; color: #b3261e; border-color: #b3261e; }
+  .levels button { padding: .5em .2em; font-size: .95rem; line-height: 1.1; background: rgba(0,0,0,.2); color: #fff; border: 3px solid transparent; }
+  .levels button small { display: block; font-family: system-ui, sans-serif; font-size: .72rem; opacity: .85; }
+  .levels button.on { border-color: var(--accent); background: rgba(255,210,61,.25); }
+  .agebox { font-size: .92rem; }
+  .catdie { display: inline-flex; align-items: center; gap: .4em; background: rgba(255,255,255,.15); border-radius: 999px; padding: .15em .8em; font-weight: 800; }
   #stage { position: fixed; inset: 0; right: 400px; }
   @media (max-width: 900px) { #stage { right: 0; bottom: 45vh; } }
   header { position: fixed; top: 12px; left: 16px; right: 416px; display: flex; align-items: center; justify-content: space-between; pointer-events: none; z-index: 5; }
@@ -70,6 +83,7 @@
 </style>
 </head>
 <body>
+<video id="bgvid" muted loop playsinline autoplay preload="auto"></video>
 <div id="stage"></div>
 <div class="loading" id="loading">Montando o tabuleiro…</div>
 <header>
@@ -100,10 +114,38 @@ const send = (m) => net.send(m);
 const now = () => Date.now() + net.offset;
 const moving = () => S?.move && now() < S.move.at + S.move.dur;
 
+const level = () => S?.settings?.level || 'kids';
 createBoard(document.getElementById('stage'), {
   onDice: () => Som.play('dado'),
-  onHop: () => Som.play('pulo', .45),
+  onHop: () => (level() === 'adulto' ? Som.play('pisada', .6) : Som.play('pulo', .45)),
+  onLand: (mv) => { Som.play('brilho', .5); if (mv.jumped && level() === 'adulto') Som.play('rugido', .7); },
+  onCatDie: (face) => {
+    Som.play('brilho', .6);
+    const c = S.categories[face];
+    toast(`<h1 style="font-size:2.4rem">${c ? `${c.emoji} ${esc(c.name)}` : '⭐ Categoria da casa'}</h1><p>Dado de categoria</p>`, 1400);
+  },
 }).then((b) => { board = b; document.getElementById('loading').remove(); if (S) board.update(S, net.offset); });
+
+// ---------- Mundo de cada nível: fundo em vídeo e música ----------
+let shownLevel = null;
+function applyLevel() {
+  const lv = level();
+  if (lv === shownLevel) return;
+  shownLevel = lv;
+  document.body.classList.remove('lvl-kids', 'lvl-familia', 'lvl-adulto');
+  document.body.classList.add('lvl-' + lv);
+  const v = document.getElementById('bgvid');
+  v.classList.remove('on');
+  // celulares fracos ou economia de dados ficam só com a imagem
+  const weak = navigator.connection?.saveData || (navigator.hardwareConcurrency || 8) <= 2;
+  if (!weak) {
+    v.src = `vid/fundo_${lv}.mp4`;
+    v.oncanplay = () => v.classList.add('on');
+    v.onerror = () => v.classList.remove('on');
+    v.play().catch(() => {});
+  }
+  Som.setTrack(lv === 'kids' ? 'musica' : 'musica_' + lv);
+}
 
 // ---------- Painel ----------
 function peopleHtml(t) {
@@ -145,6 +187,10 @@ function renderSide() {
         ${ready ? '' : '<p class="muted center" style="margin:.5em 0 0">Cada equipe precisa de pelo menos 1 celular.</p>'}
       </div>
       <div class="panel settings stack">
+        <div><b>Nível</b> <span class="muted agebox">${S.avgAge != null ? `· média de idade <b style="color:var(--accent)">${S.avgAge} anos</b> (${S.ageCount} ${S.ageCount === 1 ? 'pessoa' : 'pessoas'})` : '· informem as idades no celular'}</span></div>
+        <div class="levels">${Object.entries(S.levels).map(([k, l]) => `<button data-level="${k}" class="${s.level === k ? 'on' : ''}">${l.emoji} ${l.name}<small>${l.sub}${S.suggestedLevel === k ? ' · sugerido' : ''}</small></button>`).join('')}</div>
+        ${s.levelAuto ? '<p class="muted" style="margin:0;font-size:.85rem">O nível acompanha a média de idade. Toque em um para fixar.</p>' : '<p class="muted" style="margin:0;font-size:.85rem"><a href="#" data-level="auto" style="color:var(--accent)">Voltar a seguir a média de idade</a></p>'}
+        ${chk('catDie', '🎲 Dado de categoria')}
         <label>Equipes ${sel('teamCount', [2, 3, 4, 5, 6], s.teamCount, (o) => o)}</label>
         <label>Tempo por mímica ${sel('seconds', [30, 45, 60, 90, 120], s.seconds, (o) => o + 's')}</label>
         <label>Tabuleiro ${sel('boardLength', [21, 31, 41], s.boardLength, (o) => ({ 21: 'Curto', 31: 'Médio', 41: 'Longo' })[o])}</label>
@@ -160,7 +206,7 @@ function renderSide() {
     let body = '';
     if (S.phase === 'turn') {
       body = `${S.message ? `<div class="banner">${esc(S.message)}</div>` : ''}
-        <img class="catart" src="img/hero.jpg" alt="">
+        <img class="catart" src="img/${S.turn.teamIdx % 2 ? 'toninho' : 'hero'}.jpg" alt="">
         <h2>Vez da ${pill(team)}</h2>
         <p>Joguem o dado no celular!</p>
         <div class="btns"><button class="big" data-act="roll" ${anim ? 'disabled' : ''}>🎲 Jogar o dado daqui</button></div>`;
@@ -170,8 +216,9 @@ function renderSide() {
       else {
         const where = sq.type === 'all' ? `<img class="catart" src="img/todos.jpg"><h2>⚡ Todos jogam!</h2><p class="muted">Qualquer equipe pode adivinhar. Quem acertar ganha +3 casas.</p>`
           : sq.type === 'finish' ? `${catBlock('dificil')}<h3>Última casa! Acertem para vencer!</h3>`
-          : sq.cat ? catBlock(sq.cat) : '<p class="muted">Categoria surpresa!</p>';
-        body = `${S.message ? `<div class="banner">${esc(S.message)}</div>` : ''}${where}
+          : catBlock(S.turn.catFace && S.turn.catFace !== 'casa' ? S.turn.catFace : sq.cat || 'acao');
+        const die = S.turn.catFace && sq.type !== 'finish' ? `<p><span class="catdie">🎲 ${S.turn.catFace === 'casa' ? '⭐ Vale a categoria da casa' : 'O dado de categoria mandou!'}</span></p>` : '';
+        body = `${S.message ? `<div class="banner">${esc(S.message)}</div>` : ''}${where}${die}
           <p><b>${mimer}</b>, puxe a carta no celular.</p>
           <div class="btns two"><button class="ghost" data-act="skip_mimer">Trocar mímico</button><button class="ghost" data-act="draw">Puxar daqui</button></div>`;
       }
@@ -194,8 +241,8 @@ function renderSide() {
     side.innerHTML = `<div class="panel center">${body}</div>
       <div class="panel">${teamsHtml(false)}</div>
       <div class="row" style="justify-content:space-between">
-        <button class="ghost" data-act="skip_turn">Pular vez</button>
-        <button class="ghost" data-act="back_to_lobby" data-confirm="Voltar ao início? O placar será zerado.">Encerrar partida</button>
+        <button class="hostbtn" data-act="skip_turn">⏭️ Pular vez</button>
+        <button class="hostbtn stop" data-act="back_to_lobby" data-confirm="Voltar ao início? O placar será zerado.">⏹️ Encerrar partida</button>
       </div>`;
   }
   bindSide();
@@ -211,6 +258,7 @@ function bindSide() {
     const v = el.type === 'checkbox' ? el.checked : Number(el.value);
     send({ t: 'settings', settings: { [el.dataset.set]: v } });
   }));
+  document.querySelectorAll('[data-level]').forEach((el) => (el.onclick = (e) => { e.preventDefault(); send({ t: 'settings', settings: { level: el.dataset.level } }); }));
   document.querySelectorAll('[data-team]').forEach((el) => (el.onchange = () => send({ t: 'team_name', teamId: el.dataset.team, name: el.value })));
   const peek = document.getElementById('peek');
   if (peek) {
@@ -252,6 +300,8 @@ function onEvents() {
       } else {
         Som.play('acertou'); Som.voz('acertou', 300);
         const title = r.kind === 'steal_hit' ? 'Roubou a carta!' : 'Acertou!';
+        Som.play('torcida', .5);
+        board?.cheer();
         window.RiveFx.play('acertou', who).then((ok) => ok ? toast(`<p>${r.kind === 'steal_hit' ? 'Roubou! ' : ''}${esc(t.name)} · “${esc(r.word)}”</p>`, 2000, true)
           : (toast(`<img src="img/acertou.jpg"><h1>${title}</h1><p>${esc(t.name)} · “${esc(r.word)}”</p>`), confetti(40)));
       }
@@ -267,9 +317,16 @@ function onEvents() {
     const wait = S.move ? Math.max(0, S.move.at + S.move.dur - now()) : 0;
     setTimeout(() => { if (sq.type === 'all') Som.voz('todos'); }, wait + 50);
   }
-  if (S.phase === 'card') Som.play('carta');
+  if (S.phase === 'card' && lastPhase === 'draw') { Som.play('tambor', .6); setTimeout(() => Som.play('carta'), 900); }
+  else if (S.phase === 'card') Som.play('carta');
+  if (S.phase === 'turn' && lastPhase === 'lobby' && level() === 'adulto') Som.play('rugido', .8);
   if (S.phase === 'timeup' && lastPhase === 'miming') { Som.play('tempo'); Som.voz('tempo', 900); }
-  if (S.phase === 'over') { Som.play('vitoria'); Som.voz('vitoria', 1800); }
+  if (S.phase === 'over') {
+    Som.play('vitoria'); Som.voz('vitoria', 1800);
+    Som.play('fogos', .6); setTimeout(() => Som.play('torcida', .6), 600);
+    if (level() === 'adulto') setTimeout(() => Som.play('rugido', .9), 1200);
+    board?.shake(.25);
+  }
   if (S.phase === 'lobby' && lastPhase && lastPhase !== 'lobby') Som.startMusic();
 }
 
@@ -307,6 +364,7 @@ function render() {
   if (lastPlayers !== null && players > lastPlayers) Som.play('pop');
   lastPlayers = players;
   board?.update(S, net.offset);
+  applyLevel();
   const typing = document.activeElement?.dataset?.team;
   if (!typing) renderSide();
   renderOverlay();

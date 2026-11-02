@@ -56,7 +56,7 @@ const Som = (() => {
   const cache = {};
   let opt = { musica: true, vozes: true, efeitos: true };
   try { opt = { ...opt, ...(JSON.parse(localStorage.getItem('mimica_som2')) || {}) }; } catch {}
-  let music = null, unlocked = false, voiceBusy = null, wantMusic = false;
+  let music = null, unlocked = false, voiceBusy = null, wantMusic = false, track = 'musica';
   const save = () => { try { localStorage.setItem('mimica_som2', JSON.stringify(opt)); } catch {} };
   function get(name) {
     if (!cache[name]) { cache[name] = new Audio(`som/${name}.mp3`); cache[name].preload = 'auto'; }
@@ -82,11 +82,17 @@ const Som = (() => {
   function startMusic() {
     wantMusic = true;
     if (!opt.musica || music || !unlocked) return;
-    music = new Audio('som/musica.mp3');
+    music = new Audio(`som/${track}.mp3`);
     music.loop = true; music.volume = 0.35;
     music.play().catch(() => { music = null; });
   }
   function stopMusic() { if (music) { music.pause(); music = null; } }
+  // cada mundo tem sua música
+  function setTrack(name) {
+    if (name === track) return;
+    track = name;
+    if (music) { stopMusic(); startMusic(); }
+  }
   // navegadores só tocam som depois de um toque na tela
   function unlock(withMusic, cb) {
     wantMusic = withMusic;
@@ -123,5 +129,5 @@ const Som = (() => {
     wrap.append(menu, b);
     document.body.appendChild(wrap);
   }
-  return { play, voz, startMusic, stopMusic, unlock, button };
+  return { play, voz, startMusic, stopMusic, unlock, button, setTrack };
 })();

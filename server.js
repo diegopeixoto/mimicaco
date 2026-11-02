@@ -6,13 +6,13 @@ const path = require('path');
 const crypto = require('crypto');
 const { WebSocketServer } = require('ws');
 const QRCode = require('qrcode');
-const { CATEGORIES, TWISTS } = require('./cards');
+const { CATEGORIES, TWISTS, LEVELS } = require('./cards');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC = path.join(__dirname, 'public');
 const TEAM_PRESETS = [
   { name: 'Equipe Rawzinho', color: '#5cc93a' },
-  { name: 'Equipe Morango', color: '#e8453c' },
+  { name: 'Equipe Toninho', color: '#e8453c' },
   { name: 'Equipe Mochila', color: '#2f7bf5' },
   { name: 'Equipe Sol', color: '#ffc21a' },
   { name: 'Equipe Uva', color: '#a26bff' },
@@ -23,6 +23,23 @@ const ROOM_TTL_MS = 6 * 60 * 60 * 1000;
 const BONUS_STEAL = 2; // casas extras para quem acerta na repescagem
 const BONUS_ALL = 3; // casas extras para quem acerta no "Todos jogam"
 const JUMP = 2; // casa "Pulo do Rawzinho"
+// Faces do dado de categoria: cinco categorias e a estrela, que usa a categoria da casa.
+const CAT_FACES = ['acao', 'objeto', 'gente', 'bicho', 'lugar', 'casa'];
+
+// Nível sugerido pela média de idade das pessoas.
+function levelForAge(avg) {
+  if (avg == null) return null;
+  if (avg >= LEVELS.adulto.minAge) return 'adulto';
+  if (avg >= LEVELS.familia.minAge) return 'familia';
+  return 'kids';
+}
+function ageStats(room) {
+  const ages = [];
+  for (const p of Object.values(room.players)) for (const a of p.ages || []) if (a) ages.push(a);
+  if (!ages.length) return { avgAge: null, ageCount: 0, suggestedLevel: null };
+  const avg = ages.reduce((x, y) => x + y, 0) / ages.length;
+  return { avgAge: Math.round(avg * 10) / 10, ageCount: ages.length, suggestedLevel: levelForAge(avg) };
+}
 
 // Tempo da animação de um movimento (precisa bater com board3d.js)
 const DICE_MS = 1700;
@@ -61,7 +78,7 @@ function createRoom() {
     code,
     hostKey: crypto.randomBytes(12).toString('hex'),
     sockets: new Set(),
-    settings: { teamCount: 2, seconds: 60, boardLength: 31, twists: true, steal: true, again: true },
+    settings: { teamCount: 2, seconds: 60, boardLength: 31, twists: true, steal: true, again: true, level: 'kids', catDie: true, levelAuto: true },
     teams: [],
     players: {}, // pid -> { names: [], teamId, connected }
     phase: 'lobby', // lobby | turn | draw | card | miming | timeup | over
@@ -91,8 +108,23 @@ function setTeams(room, n) {
 }
 
 function drawWord(room, cat) {
-  if (!room.decks[cat] || room.decks[cat].length === 0) room.decks[cat] = shuffle([...CATEGORIES[cat].words]);
-  return room.decks[cat].pop();
+  const key = room.settings.level + ':' + cat;
+  if (!room.decks[key] || room.decks[key].length === 0) room.decks[key] = shuffle([...CATEGORIES[cat].words[room.settings.level]]);
+  return room.decks[key].pop();
+}
+
+function cleanAges(list) {
+  return (Array.isArray(list) ? list : []).slice(0, 8).map((a) => {
+    const n = Math.round(Number(a));
+    return n >= 2 && n <= 99 ? n : null;
+  });
+}
+
+// Enquanto o host não escolher o nível na mão, ele segue a média de idade.
+function autoLevel(room) {
+  if (room.phase !== 'lobby' || !room.settings.levelAuto) return;
+  const sug = ageStats(room).suggestedLevel;
+  if (sug) room.settings.level = sug;
 }
 
 function shuffle(a) {
@@ -142,7 +174,7 @@ function advanceMimer(room, team) {
 }
 
 function startTurn(room, teamIdx, message = '') {
-  room.turn = { teamIdx, allPlay: false, steal: false, stealIdx: null };
+  room.turn = { teamIdx, allPlay: false, steal: false, stealIdx: null, catFace: null };
   room.card = null;
   room.timerEnd = null;
   room.phase = 'turn';
@@ -213,7 +245,11 @@ function handle(room, who, msg) {
         .map((n) => String(n || '').trim().slice(0, 20))
         .filter(Boolean)
         .slice(0, 8);
-      if (names.length) me.names = names;
+      if (names.length) {
+        me.names = names;
+        me.ages = cleanAges(msg.ages).slice(0, names.length);
+        autoLevel(room);
+      }
       break;
     }
     case 'settings': {
@@ -225,7 +261,14 @@ function handle(room, who, msg) {
         room.settings.boardLength = s.boardLength;
         room.board = buildBoard(s.boardLength);
       }
-      for (const k of ['twists', 'steal', 'again']) if (typeof s[k] === 'boolean') room.settings[k] = s[k];
+      for (const k of ['twists', 'steal', 'again', 'catDie']) if (typeof s[k] === 'boolean') room.settings[k] = s[k];
+      if (s.level === 'auto') {
+        room.settings.levelAuto = true;
+        autoLevel(room);
+      } else if (LEVELS[s.level]) {
+        room.settings.level = s.level;
+        room.settings.levelAuto = false;
+      }
       room.settings.teamCount = room.teams.length;
       break;
     }
@@ -251,7 +294,10 @@ function handle(room, who, msg) {
       if (room.move && Date.now() < room.move.at + room.move.dur - 200) return; // espera a animação anterior
       const team = turnTeam(room);
       const value = 1 + crypto.randomInt(6);
+      const catFace = room.settings.catDie ? CAT_FACES[crypto.randomInt(CAT_FACES.length)] : null;
       const mv = moveTeam(room, team, value, 'dice', value);
+      mv.catFace = catFace;
+      room.turn.catFace = catFace;
       const sq = squareAt(room, team.pos);
       room.turn.allPlay = sq.type === 'all';
       room.phase = 'draw';
@@ -262,7 +308,10 @@ function handle(room, who, msg) {
       if (!can || room.phase !== 'draw') return;
       const team = turnTeam(room);
       const sq = squareAt(room, team.pos);
-      const cat = sq.cat || CAT_ORDER[crypto.randomInt(CAT_ORDER.length)];
+      // a casa final é sempre Desafio; senão vale o dado de categoria (a estrela usa a categoria da casa)
+      const face = room.turn.catFace;
+      let cat = sq.type === 'finish' ? 'dificil' : face && face !== 'casa' ? face : sq.cat;
+      if (!cat) cat = CAT_ORDER[crypto.randomInt(CAT_ORDER.length)];
       const twist = room.settings.twists && crypto.randomInt(4) === 0 ? TWISTS[crypto.randomInt(TWISTS.length)] : null;
       room.card = { cat, word: drawWord(room, cat), twist };
       room.phase = 'card';
@@ -398,6 +447,8 @@ function viewFor(room, who) {
     unassigned: Object.entries(room.players).filter(([, p]) => !p.teamId && !p.judge).map(([pid, p]) => ({ pid, ...p })),
     judges: Object.entries(room.players).filter(([, p]) => p.judge).map(([pid, p]) => ({ pid, ...p })),
     hasJudge: hasJudge(room),
+    ...ageStats(room),
+    levels: LEVELS,
     board: room.board,
     phase: room.phase,
     turn: room.turn
@@ -422,7 +473,7 @@ function broadcast(room) {
 // ---------- HTTP ----------
 const MIME = {
   '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.svg': 'image/svg+xml',
-  '.png': 'image/png', '.jpg': 'image/jpeg', '.mp3': 'audio/mpeg', '.ttf': 'font/ttf', '.txt': 'text/plain; charset=utf-8',
+  '.png': 'image/png', '.glb': 'model/gltf-binary', '.mp4': 'video/mp4', '.jpg': 'image/jpeg', '.mp3': 'audio/mpeg', '.ttf': 'font/ttf', '.txt': 'text/plain; charset=utf-8',
   '.wasm': 'application/wasm', '.riv': 'application/octet-stream',
 };
 
@@ -460,7 +511,7 @@ const server = http.createServer(async (req, res) => {
       return res.end('Não encontrado');
     }
     const ext = path.extname(full);
-    const cache = ['.jpg', '.png', '.mp3', '.ttf'].includes(ext) || full.includes('/vendor/') ? 'public, max-age=86400' : 'no-cache';
+    const cache = ['.jpg', '.png', '.mp3', '.ttf', '.glb', '.mp4'].includes(ext) || full.includes('/vendor/') ? 'public, max-age=86400' : 'no-cache';
     res.writeHead(200, { 'content-type': MIME[ext] || 'application/octet-stream', 'cache-control': cache });
     res.end(data);
   });
@@ -489,7 +540,10 @@ wss.on('connection', (ws) => {
         const pid = String(msg.pid || '').slice(0, 40) || crypto.randomUUID();
         let names = (Array.isArray(msg.names) ? msg.names : [msg.name]).map((n) => String(n || '').trim().slice(0, 20)).filter(Boolean).slice(0, 8);
         if (!names.length) names = ['Jogador'];
-        if (!room.players[pid]) room.players[pid] = { names, teamId: null, judge: false, connected: true };
+        if (!room.players[pid]) {
+          room.players[pid] = { names, ages: cleanAges(msg.ages).slice(0, names.length), teamId: null, judge: false, connected: true };
+          autoLevel(room);
+        }
         room.players[pid].connected = true;
         ws.who = { pid };
       }
