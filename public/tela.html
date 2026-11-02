@@ -303,7 +303,7 @@ function openWorlds() {
   const sug = S.suggestedLevel || S.settings.level;
   el.innerHTML = `<h1>Escolham o mundo!</h1>
     <p class="sub">${S.avgAge != null ? `Média de idade: <b>${S.avgAge} anos</b>` : 'Quanto mais longe, mais difíceis as cartas'}</p>
-    <div class="wcards">${Object.entries(S.levels).map(([k, l]) => `<button class="wcard ${k === sug ? 'sug' : ''}" data-world="${k}" style="background-image:url(img/mundo_${k}.jpg)">
+    <div class="wcards">${Object.entries(S.levels).map(([k, l]) => `<button class="wcard ${k === sug ? 'sug' : ''}" data-world="${k}" style="background-image:url(img/mundo_${k}.jpg?v=2)">
       ${k === sug ? '<span class="wbadge">⭐ Sugerido</span>' : ''}
       <div class="wtxt"><div class="wname">${l.emoji} ${esc(l.name)}</div><div class="wsub">${esc(l.sub)}</div></div></button>`).join('')}</div>
     <button class="wclose">Voltar</button>`;
