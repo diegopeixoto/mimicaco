@@ -9,7 +9,7 @@ import { RoomEnvironment } from './vendor/RoomEnvironment.js';
 const THEMES = {
   kids: {
     hemi: [0xeaf6ff, 0x6aa848, 1.05], sun: [0xffe6b8, 2.6], exposure: 1.06,
-    layers: [[0x7ccf4a, 0x9a6b3f], [0x6bb83f, 0x7d5330], [0x8a5a33, 0x6b4426]],
+    layers: [[0x62b83a, 0x9a6b3f], [0x5aa835, 0x7d5330], [0x8a5a33, 0x6b4426]],
     tufts: [0x5fb83a, 0x7ad24e, 0x4a9e30, 0x8fdc5a], fill: 0xd6ecff, rim: 0xfff2c8, env: 0.22,
     stone: 0xf3e3c3, deco: 'garden', clouds: true, mascots: [['model/rawzinho.glb', 2.0], ['model/burrinho.glb', 1.9]],
   },
@@ -501,7 +501,7 @@ export async function createBoard(container, opts = {}) {
     function grassTufts(colors) {
       const blade = new THREE.ConeGeometry(0.035, 0.22, 4);
       blade.translate(0, 0.11, 0);
-      const n = low ? 260 : 600;
+      const n = low ? 120 : 260;
       const mesh = new THREE.InstancedMesh(blade, new THREE.MeshStandardMaterial({ roughness: 0.85 }), n);
       const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), col = new THREE.Color();
       let k = 0;
@@ -818,7 +818,8 @@ export async function createBoard(container, opts = {}) {
       const kindOf = (c) => { const q = new THREE.Color(c); return q.g > q.r * 1.15 ? 'grass' : q.r > 0.6 ? 'sand' : 'dirt'; };
       const kindTop = kindOf(color);
       const m = new THREE.Mesh(geo, [
-        new THREE.MeshStandardMaterial({ map: groundTexture(color, kindTop), roughness: 0.92 }),
+        // grama em cor lisa: as casas se destacam melhor
+        kindTop === 'grass' ? new THREE.MeshStandardMaterial({ color, roughness: 0.95 }) : new THREE.MeshStandardMaterial({ map: groundTexture(color, kindTop), roughness: 0.92 }),
         new THREE.MeshStandardMaterial({ map: groundTexture(side, new THREE.Color(side).r > 0.6 ? 'sand' : 'dirt'), roughness: 0.95 })]);
       m.position.y = y;
       m.scale.set(scale, 1, scale);

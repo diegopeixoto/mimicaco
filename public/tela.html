@@ -19,6 +19,31 @@
   .levels button small { display: block; font-family: system-ui, sans-serif; font-size: .72rem; opacity: .85; }
   .levels button.on { border-color: var(--accent); background: rgba(255,210,61,.25); }
   .agebox { font-size: .92rem; }
+  /* Escolha do mundo antes do tabuleiro */
+  #worlds { position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2.2vh;
+    background: radial-gradient(circle at 50% 30%, rgba(42,37,80,.55), rgba(10,8,30,.92)); backdrop-filter: blur(8px); animation: wfade .35s ease-out; }
+  #worlds h1 { font-family: 'Lilita One', sans-serif; font-weight: 400; font-size: clamp(2rem, 4.4vw, 3.6rem); margin: 0; color: #fff; -webkit-text-stroke: 2px #123a7a; paint-order: stroke fill; text-shadow: 0 5px 0 #123a7a; }
+  #worlds .sub { color: #fff; opacity: .85; margin: -1vh 0 0; font-size: 1.1rem; }
+  .wcards { display: flex; gap: 2.4vw; align-items: stretch; }
+  .wcard { position: relative; width: min(25vw, 46vh); aspect-ratio: 2 / 3; border-radius: 28px; overflow: hidden; cursor: pointer; padding: 0; border: 6px solid #fff;
+    background: #222 center / cover no-repeat; box-shadow: 0 14px 0 rgba(0,0,0,.35), 0 20px 50px rgba(0,0,0,.45); transition: transform .25s cubic-bezier(.3,1.6,.5,1), box-shadow .25s;
+    animation: wpop .55s cubic-bezier(.3,1.6,.5,1) backwards; }
+  .wcard:nth-child(2) { animation-delay: .08s; } .wcard:nth-child(3) { animation-delay: .16s; }
+  .wcard:hover, .wcard:focus-visible { transform: translateY(-10px) rotate(-1.5deg) scale(1.04); outline: none; }
+  .wcard .wtxt { position: absolute; left: 0; right: 0; bottom: 0; padding: 18% 6% 7%; text-align: center; color: #fff;
+    background: linear-gradient(transparent, rgba(0,0,0,.75) 45%); }
+  .wcard .wname { font-family: 'Lilita One', sans-serif; font-size: clamp(1.6rem, 2.6vw, 2.6rem); line-height: 1; -webkit-text-stroke: 1.5px rgba(0,0,0,.5); paint-order: stroke fill; }
+  .wcard .wsub { font-weight: 800; font-size: 1.05rem; opacity: .95; margin-top: .3em; }
+  .wcard .wbadge { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); white-space: nowrap; background: var(--accent); color: #2a2550; font-weight: 900;
+    padding: .35em .9em; border-radius: 999px; box-shadow: 0 4px 0 rgba(0,0,0,.3); animation: wbob 1.2s ease-in-out infinite; }
+  .wcard.sug { border-color: var(--accent); }
+  .wcard.go { z-index: 2; transition: transform 1s cubic-bezier(.6,0,.3,1), opacity 1s, border-radius 1s; transform: scale(5); opacity: 0; border-radius: 0; }
+  .wcard.away { transition: transform .5s, opacity .5s; transform: translateY(40px) scale(.9); opacity: 0; }
+  #worlds .wclose { background: rgba(255,255,255,.15); color: #fff; box-shadow: none; border: 2px solid rgba(255,255,255,.5); }
+  @keyframes wfade { from { opacity: 0; } }
+  @keyframes wpop { from { opacity: 0; transform: translateY(60px) scale(.8); } }
+  @keyframes wbob { 50% { transform: translateX(-50%) translateY(-4px); } }
+  @media (max-width: 900px) { .wcards { flex-direction: column; } .wcard { width: 70vw; aspect-ratio: 16 / 7; } }
   .catdie { display: inline-flex; align-items: center; gap: .4em; background: rgba(255,255,255,.15); border-radius: 999px; padding: .15em .8em; font-weight: 800; }
   #stage { position: fixed; inset: 0; right: 400px; }
   @media (max-width: 900px) { #stage { right: 0; bottom: 45vh; } }
@@ -183,7 +208,7 @@ function renderSide() {
       </div>
       <div class="panel">${teamsHtml(true)}
         ${S.unassigned.length ? `<p class="muted">Escolhendo equipe: ${S.unassigned.map((p) => esc(p.names.join(' e '))).join(', ')}</p>` : ''}
-        <div class="btns"><button class="big" data-act="start_game" ${ready ? '' : 'disabled'}>Começar jogo</button></div>
+        <div class="btns"><button class="big" id="pickworld" ${ready ? '' : 'disabled'}>Começar jogo</button></div>
         ${ready ? '' : '<p class="muted center" style="margin:.5em 0 0">Cada equipe precisa de pelo menos 1 celular.</p>'}
       </div>
       <div class="panel settings stack">
@@ -258,6 +283,8 @@ function bindSide() {
     const v = el.type === 'checkbox' ? el.checked : Number(el.value);
     send({ t: 'settings', settings: { [el.dataset.set]: v } });
   }));
+  const pw = document.getElementById('pickworld');
+  if (pw) pw.onclick = openWorlds;
   document.querySelectorAll('[data-level]').forEach((el) => (el.onclick = (e) => { e.preventDefault(); send({ t: 'settings', settings: { level: el.dataset.level } }); }));
   document.querySelectorAll('[data-team]').forEach((el) => (el.onchange = () => send({ t: 'team_name', teamId: el.dataset.team, name: el.value })));
   const peek = document.getElementById('peek');
@@ -265,6 +292,37 @@ function bindSide() {
     peek.addEventListener('pointerdown', (e) => { e.preventDefault(); send({ t: 'peek', on: true }); });
     ['pointerup', 'pointerleave', 'pointercancel'].forEach((ev) => peek.addEventListener(ev, () => send({ t: 'peek', on: false })));
   }
+}
+
+// ---------- Escolha do mundo (antes do tabuleiro) ----------
+function openWorlds() {
+  if (document.getElementById('worlds')) return;
+  const el = document.createElement('div');
+  el.id = 'worlds';
+  const sug = S.suggestedLevel || S.settings.level;
+  el.innerHTML = `<h1>Escolham o mundo!</h1>
+    <p class="sub">${S.avgAge != null ? `Média de idade: <b>${S.avgAge} anos</b>` : 'Quanto mais longe, mais difíceis as cartas'}</p>
+    <div class="wcards">${Object.entries(S.levels).map(([k, l]) => `<button class="wcard ${k === sug ? 'sug' : ''}" data-world="${k}" style="background-image:url(img/mundo_${k}.jpg)">
+      ${k === sug ? '<span class="wbadge">⭐ Sugerido</span>' : ''}
+      <div class="wtxt"><div class="wname">${l.emoji} ${esc(l.name)}</div><div class="wsub">${esc(l.sub)}</div></div></button>`).join('')}</div>
+    <button class="wclose">Voltar</button>`;
+  document.body.appendChild(el);
+  Som.play('pop');
+  el.querySelector('.wclose').onclick = () => el.remove();
+  el.querySelectorAll('[data-world]').forEach((b) => {
+    b.onmouseenter = () => Som.play('pop', .4);
+    b.onclick = () => {
+      if (el.dataset.busy) return;
+      el.dataset.busy = 1;
+      const k = b.dataset.world;
+      send({ t: 'settings', settings: { level: k } });
+      Som.play('brilho');
+      if (k === 'adulto') Som.play('rugido', .8);
+      el.querySelectorAll('.wcard').forEach((c) => c.classList.add(c === b ? 'go' : 'away'));
+      el.style.transition = 'opacity .6s .7s'; el.style.opacity = 0;
+      setTimeout(() => { send({ t: 'start_game' }); el.remove(); }, 1200);
+    };
+  });
 }
 
 // ---------- Avisos grandes ----------
