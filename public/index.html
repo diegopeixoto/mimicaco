@@ -12,7 +12,7 @@
   /* tela larga (TV/notebook): os dois cartões lado a lado, tudo cabe sem rolar */
   @media (min-width: 820px) and (orientation: landscape) {
     main { max-width: 860px; padding-top: 3vh; }
-    .hero { width: min(140px, 18vh) !important; height: min(140px, 18vh) !important; }
+    .hero { width: min(120px, 15vh) !important; height: min(120px, 15vh) !important; }
     .brandlogo { width: min(300px, 32vh) !important; }
     .logo { font-size: 2.4rem; }
     .tag { margin-bottom: 1rem; }
@@ -35,6 +35,7 @@
     <input id="code" class="code" maxlength="4" placeholder="CÓDIGO" autocomplete="off">
     <input id="name" maxlength="20" placeholder="Seu nome">
     <button class="big" id="join">Entrar na sala</button>
+    <p class="muted" style="margin:0;font-size:.85rem">Ao entrar, você concorda com os <a href="termos.html" style="color:inherit">Termos de uso</a> e a <a href="privacidade.html" style="color:inherit">Política de privacidade</a>.</p>
   </div>
 
   <div class="panel stack">
@@ -44,6 +45,8 @@
   </div>
   </div>
 </main>
+<footer id="rodape" data-fixo></footer>
+<script src="rodape.js"></script>
 <script src="net.js"></script>
 <script>
   const last = store('mimica_player');
