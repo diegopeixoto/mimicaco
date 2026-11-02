@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#123a7a">
+<title>Teste Rive · Mimicaço</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  body { min-height: 100dvh; background: #8fd16a url(img/fundo_celular.jpg) center top/cover fixed; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; background: linear-gradient(180deg, rgba(18,58,122,.35), rgba(18,58,122,.85)); }
+  main { max-width: 480px; margin: 0 auto; padding: 12px 16px 40px; text-align: center; }
+  .stage { position: relative; width: 100%; aspect-ratio: 500 / 640; }
+  #rive { width: 100%; height: 100%; display: block; touch-action: manipulation; }
+  .btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px; }
+  .btns button { font-size: 1.1rem; padding: .8em; }
+  .info { font-size: .85rem; color: var(--muted); margin-top: 14px; line-height: 1.4; }
+  .info b { color: #fff; }
+</style>
+</head>
+<body>
+<main>
+  <h2>Rawzinho em Rive</h2>
+  <div class="stage"><canvas id="rive" width="500" height="640"></canvas></div>
+  <div class="btns">
+    <button data-t="acertou" style="background:var(--good);color:#fff">Acertou!</button>
+    <button data-t="errou" class="bad">Ninguém acertou</button>
+    <button data-t="carta">Puxar carta</button>
+    <button data-t="cocegas" class="ghost">Cócegas</button>
+  </div>
+  <p class="info">Toque no Rawzinho também. <span id="stats">Carregando…</span></p>
+</main>
+<script src="vendor/rive/rive.js"></script>
+<script>
+  const t0 = performance.now();
+  rive.RuntimeLoader.setWasmUrl('vendor/rive/rive.wasm');
+  const canvas = document.getElementById('rive');
+  const SM = 'Reacoes';
+  let inputs = {};
+  const r = new rive.Rive({
+    src: 'rive/rawzinho.riv',
+    canvas,
+    autoplay: true,
+    stateMachines: SM,
+    layout: new rive.Layout({ fit: rive.Fit.Contain, alignment: rive.Alignment.BottomCenter }),
+    onLoad: () => {
+      r.resizeDrawingSurfaceToCanvas();
+      for (const i of r.stateMachineInputs(SM)) inputs[i.name] = i;
+      document.getElementById('stats').innerHTML = `Pronto em <b>${Math.round(performance.now() - t0)} ms</b>. <span id="fps"></span>`;
+      window.riveReady = true;
+    },
+    onLoadError: (e) => { document.getElementById('stats').textContent = 'Erro ao carregar: ' + e; window.riveError = String(e); },
+  });
+  window.riveInst = r;
+  const fire = (name) => { inputs[name]?.fire(); navigator.vibrate?.(30); };
+  window.fire = fire;
+  document.querySelectorAll('[data-t]').forEach((b) => b.onclick = () => fire(b.dataset.t));
+  canvas.addEventListener('pointerdown', () => fire('cocegas'));
+  addEventListener('resize', () => r.resizeDrawingSurfaceToCanvas());
+  // medidor simples de quadros por segundo
+  let frames = 0, last = performance.now();
+  (function loop(now) {
+    frames++;
+    if (now - last > 1000) {
+      const el = document.getElementById('fps');
+      if (el) el.innerHTML = `<b>${Math.round(frames * 1000 / (now - last))}</b> quadros/s.`;
+      frames = 0; last = now;
+    }
+    requestAnimationFrame(loop);
+  })(last);
+</script>
+</body>
+</html>
