@@ -9,16 +9,27 @@
   main { max-width: 440px; margin: 0 auto; padding: 5vh 16px 32px; text-align: center; }
   .logo { font-family: 'Lilita One', sans-serif; font-size: 3rem; color: #fff; -webkit-text-stroke: 2px #123a7a; paint-order: stroke fill; text-shadow: 0 5px 0 #123a7a; margin-top: -.2em; }
   .tag { font-size: 1.15rem; text-shadow: 0 2px 6px rgba(0,0,0,.7), 0 0 2px #123a7a; margin-bottom: 2rem; }
+  /* tela larga (TV/notebook): os dois cartões lado a lado, tudo cabe sem rolar */
+  @media (min-width: 820px) and (orientation: landscape) {
+    main { max-width: 860px; padding-top: 3vh; }
+    .hero { width: min(140px, 18vh) !important; height: min(140px, 18vh) !important; }
+    .brandlogo { width: min(300px, 32vh) !important; }
+    .logo { font-size: 2.4rem; }
+    .tag { margin-bottom: 1rem; }
+    .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: stretch; text-align: center; }
+    .cards .panel { margin: 0; justify-content: space-between; }
+  }
   .code { text-transform: uppercase; text-align: center; font-size: 1.6rem; letter-spacing: .3em; font-weight: 800; }
 </style>
 </head>
 <body>
 <main class="stack">
-  <img src="img/logo.png" alt="Turma do Rawzinho" style="width:min(320px,80vw);display:block;margin:0 auto;filter:drop-shadow(0 6px 0 rgba(0,0,0,.2))">
+  <img class="brandlogo" src="img/logo.png" alt="Turma do Rawzinho" style="width:min(320px,80vw);display:block;margin:0 auto;filter:drop-shadow(0 6px 0 rgba(0,0,0,.2))">
   <div class="logo">Mimic<span>aço</span></div>
-  <img src="img/hero.jpg" alt="" style="width:170px;height:170px;border-radius:50%;object-fit:cover;border:5px solid #fff;box-shadow:0 8px 0 rgba(10,30,70,.3)">
+  <img class="hero" src="img/hero.jpg" alt="" style="width:170px;height:170px;border-radius:50%;object-fit:cover;border:5px solid #fff;box-shadow:0 8px 0 rgba(10,30,70,.3)">
   <p class="tag" style="font-weight:700">A mímica da Turma do Rawzinho! Uma tela mostra o tabuleiro e cada celular vira o controle do jogador.</p>
 
+  <div class="cards stack">
   <div class="panel stack">
     <h3>Vou jogar pelo celular</h3>
     <input id="code" class="code" maxlength="4" placeholder="CÓDIGO" autocomplete="off">
@@ -30,6 +41,7 @@
     <h3>Esta é a tela principal</h3>
     <p class="muted" style="margin:0">Abra na TV, no notebook ou num celular que fique à vista de todos.</p>
     <button class="big ghost" id="create">Criar sala nova</button>
+  </div>
   </div>
 </main>
 <script src="net.js"></script>
