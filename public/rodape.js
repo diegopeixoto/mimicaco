@@ -11,12 +11,15 @@
       <a class="rodape-dev" href="https://aquarela.io" target="_blank" rel="noopener">Desenvolvido por <img src="img/aquarela.svg" alt="aquarela.io"></a>
       <a href="termos.html">Termos de uso</a>
       <a href="privacidade.html">Privacidade</a>
+      <a class="rodape-yt" href="https://www.youtube.com/@TurmadoRawzinho" target="_blank" rel="noopener"><svg viewBox="0 0 28 20" aria-hidden="true"><rect width="28" height="20" rx="5" fill="#ff0033"/><path d="M11 5.5v9l8-4.5z" fill="#fff"/></svg>${mini ? 'YouTube' : 'Turma do Rawzinho no YouTube'}</a>
     </div>`;
   const css = `
     #rodape { font-size: .85rem; color: #fff; text-align: center; padding: 18px 12px 22px; text-shadow: 0 1px 3px rgba(0,0,0,.7); }
     #rodape .rodape-linha { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 4px 14px; margin: 4px 0; }
     #rodape a { color: #fff; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
     #rodape .rodape-dev { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
+    #rodape .rodape-yt { display: inline-flex; align-items: center; gap: 6px; }
+    #rodape .rodape-yt svg { height: 14px; width: auto; filter: drop-shadow(0 1px 2px rgba(0,0,0,.5)); }
     #rodape .rodape-dev img { height: 14px; width: auto; filter: drop-shadow(0 1px 2px rgba(0,0,0,.6)); }
     #rodape[data-mini] { position: fixed; left: 66px; bottom: 8px; z-index: 5; padding: 4px 10px; font-size: .72rem; text-align: left;
       background: rgba(18,58,122,.55); border-radius: 10px; opacity: .85; }
