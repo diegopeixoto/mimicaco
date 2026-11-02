@@ -5,7 +5,7 @@
 (() => {
   const DUR = { acertou: 2000, errou: 2000, carta: 2350, cocegas: 1100 };
   const SM = 'Reacoes';
-  let runtime = null, hideTimer = null, off = false;
+  let runtime = null, hideTimer = null, active = null, off = false;
   const chars = {}; // nome -> Promise<{ r, inputs, canvas }>
   try { off = new URLSearchParams(location.search).get('rive') === '0'; } catch {}
 
@@ -72,6 +72,9 @@
       const d = el();
       d.querySelectorAll('canvas').forEach((c) => c.classList.toggle('on', c === canvas));
       d.classList.add('show');
+      // outro personagem ainda rodando (reação em cima de reação): pausa ele, já que o timer abaixo é substituído
+      if (active && active !== r) active.pause(SM);
+      active = r;
       r.resizeDrawingSurfaceToCanvas();
       r.play(SM);
       inputs[trigger].fire();
