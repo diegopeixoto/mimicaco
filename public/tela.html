@@ -122,6 +122,7 @@
 
 <script src="net.js"></script>
 <script src="rive-fx.js"></script>
+<script src="carregando.js"></script>
 <script type="module">
 import { createBoard } from './board3d.js';
 
@@ -140,7 +141,7 @@ const now = () => Date.now() + net.offset;
 const moving = () => S?.move && now() < S.move.at + S.move.dur;
 
 const level = () => S?.settings?.level || 'kids';
-createBoard(document.getElementById('stage'), {
+const boardPronto = createBoard(document.getElementById('stage'), {
   onDice: () => Som.play('dado'),
   onHop: () => (level() === 'adulto' ? Som.play('pisada', .6) : Som.play('pulo', .45)),
   onLand: (mv) => { Som.play('brilho', .5); if (mv.jumped && level() === 'adulto') Som.play('rugido', .7); },
@@ -451,6 +452,15 @@ setInterval(() => {
   lastSec = sec;
 }, 200);
 Som.button(true);
+// vozes, música e efeitos baixam com o Rawzinho animado na frente; o toque em "começar" já libera o som
+const load = Carregando.abrir({ quem: 'rawzinho', comecar: true, aoFechar: () => {
+  RiveFx.preload('toninho').catch(() => {});
+  Som.preload(['musica_familia', 'musica_adulto'], Carregando.baixar); // músicas dos outros mundos, em segundo plano
+} });
+Som.preload(['musica', 'voz_boasvindas', 'voz_suavez', 'voz_acertou', 'voz_errou', 'voz_todos', 'voz_tempo', 'voz_vitoria',
+  'acertou', 'errou', 'tempo', 'vitoria', 'carta', 'dado', 'pulo', 'pop', 'tique', 'brilho', 'fogos', 'pisada', 'rugido', 'tambor', 'torcida'], load.baixar);
+load.esperar(boardPronto, 700000);
+load.pronto();
 Som.unlock(true, () => S && S.phase === 'lobby' && Som.voz('boasvindas', 400));
 </script>
 <footer id="rodape" data-mini></footer>
