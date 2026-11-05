@@ -1,0 +1,58 @@
+; Engine configuration file.
+; Mimicaço da Turma do Rawzinho: versão Godot para Steam, tablets e lojas de apps.
+
+config_version=5
+
+[application]
+
+config/name="Mimicaço da Turma do Rawzinho"
+config/description="A mímica da Turma do Rawzinho: tabuleiro 3D, três mundos e cartas para crianças, família e adultos."
+config/version="1.0.0"
+run/main_scene="res://scenes/main.tscn"
+config/features=PackedStringArray("4.7", "Forward Plus")
+config/icon="res://icon.png"
+boot_splash/bg_color=Color(0.0705882, 0.227451, 0.478431, 1)
+boot_splash/image="res://assets/img/logo.png"
+boot_splash/fullsize=false
+boot_splash/use_filter=true
+config/use_custom_user_dir=true
+config/custom_user_dir_name="Mimicaco"
+
+[autoload]
+
+Cartas="*res://scripts/autoload/cartas.gd"
+Config="*res://scripts/autoload/config.gd"
+Tema="*res://scripts/autoload/tema.gd"
+Som="*res://scripts/autoload/som.gd"
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/size/window_width_override=1600
+window/size/window_height_override=900
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+window/handheld/orientation=4
+window/energy_saving/keep_screen_on=true
+
+[gui]
+
+common/drop_mouse_on_gui_input_disabled=true
+
+[input_devices]
+
+pointing/emulate_mouse_from_touch=true
+
+[rendering]
+
+renderer/rendering_method="forward_plus"
+renderer/rendering_method.mobile="mobile"
+rendering_device/fallback_to_opengl3=true
+textures/vram_compression/import_etc2_astc=true
+anti_aliasing/quality/msaa_3d=2
+lights_and_shadows/directional_shadow/size=4096
+lights_and_shadows/directional_shadow/size.mobile=2048
+lights_and_shadows/directional_shadow/soft_shadow_filter_quality=3
+lights_and_shadows/directional_shadow/soft_shadow_filter_quality.mobile=1
+environment/defaults/default_clear_color=Color(0.0705882, 0.227451, 0.478431, 1)
